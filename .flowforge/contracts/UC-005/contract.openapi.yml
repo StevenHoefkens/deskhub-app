@@ -1,0 +1,148 @@
+openapi: "3.0.3"
+info:
+  title: "Search available desks"
+  version: "1.0.0"
+
+paths:
+  /desks:
+    get:
+      operationId: "searchAvailableDesks"
+      summary: "Search available desks for a date, granularity and tag filters, scoped to the employee's bookable zones"
+      tags:
+        - "reservation"
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: "Search date; must be today or later and within the rolling 30-day horizon"
+          schema:
+            type: string
+            format: date
+          example: "2026-07-27"
+        - name: granularity
+          in: query
+          required: true
+          description: "Booking granularity to check availability for"
+          schema:
+            $ref: "#/components/schemas/Granularity"
+        - name: tags
+          in: query
+          required: false
+          description: "Tag filters; a desk must carry ALL supplied tags (AND semantics)"
+          schema:
+            type: array
+            items:
+              type: string
+          example:
+            - "standing"
+            - "dual-monitor"
+      responses:
+        "200":
+          description: "Search results (may be empty)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeskSearchResults"
+        "400":
+          description: "Validation error — date in the past or beyond the rolling 30-day horizon"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    # --- Response Schema (the success data body, camelCase, unwrapped) ---
+    DeskSearchResults:
+      type: object
+      required:
+        - date
+        - granularity
+        - noBookingAccess
+        - desks
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-07-27"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
+        noBookingAccess:
+          type: boolean
+          description: "True when the employee's effective bookable-zone set is empty; desks is then empty"
+          example: false
+        desks:
+          type: array
+          description: "Available desks matching the search; empty when none match or the employee has no access"
+          items:
+            $ref: "#/components/schemas/AvailableDesk"
+
+    AvailableDesk:
+      type: object
+      required:
+        - deskId
+        - zoneId
+        - floor
+        - tags
+      properties:
+        deskId:
+          type: string
+          example: "desk-2b-014"
+        zoneId:
+          type: string
+          example: "zone-2b"
+        floor:
+          type: string
+          description: "Floor label (may be negative, e.g. -1)"
+          example: "2"
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - "standing"
+            - "dual-monitor"
+
+    Granularity:
+      type: string
+      description: "Booking granularity — a full day, or the morning or afternoon half-day"
+      enum:
+        - FULL_DAY
+        - MORNING
+        - AFTERNOON
+      example: "FULL_DAY"
+
+    # --- Error Body Schema (STD-001) ---
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: INVALID_DATE."
+          example: "INVALID_DATE"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users"
+          example: "Date must be within the next 30 days."
+        details:
+          type: array
+          description: "Field-level validation errors (HTTP 400 — STD-001 Rule 8)"
+          items:
+            type: object
+            required:
+              - field
+              - rule
+              - message
+            properties:
+              field:
+                type: string
+                example: "date"
+              rule:
+                type: string
+                example: "horizon"
+              message:
+                type: string
+                example: "Date must be within the next 30 days."
