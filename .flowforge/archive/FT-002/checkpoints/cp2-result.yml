@@ -1,0 +1,71 @@
+checkpoint: 2
+name: "Domain Logic & Rules"
+status: passed
+started_at: '2026-07-25T18:34:00Z'
+completed_at: '2026-07-25T18:36:00Z'
+duration_ms: 120000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 46
+  passed: 46
+  failed: 0
+  skipped: 0
+  command: "npx vitest run src/lib/booking src/validation (full regression: npm test -> 188 passed)"
+review_findings:
+  critical: 0
+  important: 0
+  minor: 4
+  resolution: "2 Minor fixed (isRealCalendarDate real-date validation; UNKNOWN_GRANULARITY_LABEL_KEY constant); 30-day inclusive-boundary logged as spec gap for Phase 2; invalid-vs-missing granularity message left as-is (fixed-option combobox)"
+files_touched:
+  created:
+    - src/lib/booking/booking-window.ts
+    - src/lib/booking/granularity.ts
+    - src/lib/booking/reservation-display.ts
+    - src/validation/reservation.ts
+    - src/lib/booking/__tests__/booking-window.spec.ts
+    - src/lib/booking/__tests__/granularity.spec.ts
+    - src/lib/booking/__tests__/reservation-display.spec.ts
+    - src/validation/__tests__/reservation.spec.ts
+  modified: []
+  deleted: []
+reasoning_entries: 4
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check && npm test"
+  exit_code: 0
+  summary: "vue-tsc clean; full suite 182/182 pass; CP2 units 40/40; eslint 0 warnings"
+  timestamp: '2026-07-25T18:36:10Z'
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: "camelCase verb-first fns (isWithinBookingWindow, validateDeskSearch); SCREAMING_SNAKE constants; kebab-case files"
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: "RESERVATION_HORIZON_DAYS, ISO_DATE_PATTERN, validation message constants in reservation.ts"
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: "no new deps; pure TS logic"
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: "type-check + eslint clean (exit 0)"
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: "no comments; names carry intent; no spec/standard citations"
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: "no owned Gherkin scenarios in this slice (all UCs upstream_dependency) -> CP2 unit tests legitimately carry no scenario keys (rule 6)"
+    deviated: false
+  - id: STD-038
+    name: Vue Form State & Validation Patterns
+    where: "src/validation/reservation.ts — validators return FieldError[]; order required->format->window; user-facing messages (rule 6); fieldErrorMap (rule 7); server business rules excluded (rule 8)"
+    deviated: false
+  - id: STD-039
+    name: Vue Component Composition Patterns
+    where: "src/lib/booking/reservation-display.ts — config-driven enum->config maps with graceful missing-key fallback (rule 19)"
+    deviated: false

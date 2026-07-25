@@ -1,0 +1,58 @@
+checkpoint: 1
+name: "Domain Model & Contracts"
+status: passed
+started_at: '2026-07-25T18:26:00Z'
+completed_at: '2026-07-25T18:29:00Z'
+duration_ms: 180000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 18
+  passed: 18
+  failed: 0
+  skipped: 0
+  command: "npm run type-check && npx vitest run src/types/__tests__/booking.spec.ts"
+files_touched:
+  created:
+    - src/types/booking.ts
+    - src/types/errors.ts
+    - src/types/__tests__/booking.spec.ts
+  modified:
+    - src/types/contracts/uc-001.ts
+    - src/types/contracts/uc-004.ts
+    - src/types/contracts/uc-005.ts
+    - src/types/contracts/uc-006.ts
+    - src/types/contracts/uc-007.ts
+  deleted: []
+reasoning_entries: 4
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check"
+  exit_code: 0
+  summary: "vue-tsc --build clean; booking type tests 16/16 pass; eslint 0 warnings"
+  timestamp: '2026-07-25T18:29:10Z'
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: "src/types/booking.ts, src/types/errors.ts — PascalCase types, kebab-case files"
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: "no literals introduced; enum unions sourced from contract"
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: "no new deps at CP1; contract types via existing openapi-typescript"
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: "type-check + eslint clean (exit 0)"
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: "no spec/standard citations in generated type files"
+    deviated: false
+  - id: STD-037
+    name: Vue API Client & Query Composables
+    where: "src/types/booking.ts, errors.ts — request/response + error wire types (ApiErrorBody, ApiErrorDetail) bound to the generated contract snapshot (rules 15-16). FieldError { field, reason } is the standard-mandated normalized view model (rule 7 / STD-038 rules 4,7), not a wire type; extractErrorInfo will map ApiErrorDetail -> FieldError at CP3."
+    deviated: false

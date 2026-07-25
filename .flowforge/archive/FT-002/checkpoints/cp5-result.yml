@@ -1,0 +1,55 @@
+checkpoint: 5
+name: "Deployment Topology"
+status: passed
+started_at: '2026-07-25T19:01:30Z'
+completed_at: '2026-07-25T19:03:00Z'
+duration_ms: 90000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 312
+  passed: 312
+  failed: 0
+  skipped: 0
+  command: "npm run build && npm test"
+files_touched:
+  created: []
+  modified:
+    - README.md
+  deleted: []
+reasoning_entries: 2
+tdd_compliance: true
+verification_evidence:
+  command: "npm run build && npm test"
+  exit_code: 0
+  summary: "production build OK; total JS 55.2 KB gzipped (budget 200 KB); route chunks 2-3.3 KB each (<50 KB); full regression 312/312; eslint 0; vue-tsc 0"
+  timestamp: '2026-07-25T19:03:10Z'
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: "env var VITE_API_BASE_URL follows VITE_ prefix convention (README)"
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: "no new literals; build config unchanged"
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: "build succeeds; depcheck (CP3) confirmed 0 unused; no build-only deps added"
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: "build + type-check + lint exit 0, no warnings"
+    deviated: false
+  - id: STD-020
+    name: Service README
+    where: "README.md Environment Variables updated with VITE_API_BASE_URL (new booking-api base URL); test/build commands already documented"
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: "no code comments added at CP5"
+    deviated: false
+  - id: STD-005
+    name: Performance Budgets
+    where: "bundle budget ENFORCED via postbuild check-bundle-budget.mjs: 55.2 KB gzipped < 200 KB (r10), per-route chunks <50 KB (r11), route views lazy-loaded (code splitting). Web-Vitals synthetic checks (r15 LCP/INP/CLS) are a CI/infra concern not configured in this repo at P1 (advisory, not code-generated here)."
+    deviated: false

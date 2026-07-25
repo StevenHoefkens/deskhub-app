@@ -14,4 +14,16 @@ describe('router', () => {
     await router.isReady()
     expect(router.currentRoute.value.path).toBe(LOGIN_ROUTE_PATH)
   })
+
+  it('registers the find-desk route', () => {
+    const route = router.resolve('/desks')
+    expect(route.name).toBe('find-desk')
+    expect(route.matched.length).toBeGreaterThan(0)
+  })
+
+  it('registers the my-reservations route', () => {
+    const route = router.resolve('/reservations')
+    expect(route.name).toBe('my-reservations')
+    expect(route.matched.length).toBeGreaterThan(0)
+  })
 })
