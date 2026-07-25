@@ -1,0 +1,128 @@
+manifest_schema_version: 2
+service: deskhub-app
+feature:
+  id: FT-001
+  name: SSO Login and Authenticated Session
+  slug: sso-login-and-authenticated-session
+generation_strategy:
+  mode: incremental
+  promotion_tier: new
+  reason: No promotion.yml entries matched the touched pattern_types — defaulting to incremental.
+  checkpoints:
+    - name: Domain Model & Contracts
+      description: Data models, schemas, event definitions, repository interfaces, API/message contracts
+    - name: Domain Logic & Rules
+      description: Domain services, validation rules, business logic, aggregate behavior, state machines
+    - name: Interface Layer
+      description: API endpoints, event handlers, function entry points, middleware
+    - name: Presentation
+      description: UI components, pages, design token application, client-side state
+      optional: true
+    - name: Deployment Topology
+      description: Infrastructure-as-code, CI/CD configuration, deployment manifests
+  max_retries: 2
+specs:
+  - id: UC-001
+    kind: upstream_dependency
+    action: create
+    path: specs/access/UC-001-authenticate-via-sso
+    files:
+      meta.yml: specs/access/UC-001-authenticate-via-sso/meta.yml
+      scenarios.feature: specs/access/UC-001-authenticate-via-sso/scenarios.feature
+      contract.openapi.yml: specs/access/UC-001-authenticate-via-sso/contract.openapi.yml
+      flow.mermaid: specs/access/UC-001-authenticate-via-sso/flow.mermaid
+      constraints.md: specs/access/UC-001-authenticate-via-sso/constraints.md
+    service: deskhub-api
+    domain: access
+    spec_hash: 0b45005bfd745e3d9388239e9372fabb3e0bf9a318aafee314c1c9a223c31df2
+screens:
+  - id: SCR-001
+    action: create
+    path: screens/deskhub-app/auth/SCR-001-login-page.yml
+    app: deskhub-app
+    spec_hash: 8f9cd36df5522ad18f96497337555f62c1f91314617b999368934e53fccc8eb4
+standards:
+  - id: STD-003
+    name: Naming Conventions
+    category: general
+    path: standards/general/naming-conventions.md
+  - id: STD-005
+    name: Performance Budgets
+    category: nfr
+    path: standards/nfr/performance-budgets.md
+  - id: STD-017
+    name: No Magic Values
+    category: general
+    path: standards/general/STD-017-no-magic-values.md
+  - id: STD-018
+    name: No Unused Dependencies
+    category: general
+    path: standards/general/STD-018-no-unused-dependencies.md
+  - id: STD-019
+    name: Zero Warnings
+    category: general
+    path: standards/general/STD-019-zero-warnings.md
+  - id: STD-020
+    name: Service README
+    category: general
+    path: standards/general/STD-020-service-readme.md
+  - id: STD-032
+    name: Comment Discipline
+    category: general
+    path: standards/general/STD-032-comment-discipline.md
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    category: general
+    path: standards/general/STD-035-scenario-key-binding.md
+  - id: STD-036
+    name: Vue Component Structure
+    category: vue
+    path: standards/vue/STD-036-component-structure.md
+  - id: STD-037
+    name: Vue API Client & Query Composables
+    category: vue
+    path: standards/vue/STD-037-api-client-composables.md
+  - id: STD-038
+    name: Vue Form State & Validation Patterns
+    category: vue
+    path: standards/vue/STD-038-form-patterns.md
+  - id: STD-039
+    name: Vue Component Composition Patterns
+    category: vue
+    path: standards/vue/STD-039-component-patterns.md
+  - id: STD-040
+    name: Vue View & Routing Structure
+    category: vue
+    path: standards/vue/STD-040-view-routing-structure.md
+design_system:
+  app: deskhub-app
+  layers:
+    - design-system/_base/tokens.yml
+    - design-system/deskhub-app/tokens.yml
+  inventory:
+    - design-system/_base/inventory.yml
+    - design-system/deskhub-app/inventory.yml
+code_repos:
+  - service: deskhub-api
+    expected_remote: git@github.com:StevenHoefkens/deskhub-api.git
+  - service: deskhub-app
+    expected_remote: git@github.com:StevenHoefkens/deskhub-app.git
+dependency_build_order:
+  build_order:
+    - UC-001
+    - UC-002
+    - UC-003
+  waves:
+    - wave: 1
+      specs:
+        - UC-001
+        - UC-002
+    - wave: 2
+      specs:
+        - UC-003
+  critical_path:
+    - UC-001
+    - UC-003
+assembled_at: '2026-07-25T13:48:24.195Z'
+product_hub_commit: 9ba0892ff82fa2d534d7ace44d04416cf36bba3c
+product_hub_remote: git@github.com:StevenHoefkens/deskhub.git

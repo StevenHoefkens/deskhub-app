@@ -1,0 +1,136 @@
+openapi: "3.0.3"
+info:
+  title: "Authenticate via SSO"
+  version: "1.0.0"
+
+paths:
+  /auth/sso/callback:
+    post:
+      operationId: "authenticateViaSsoCallback"
+      summary: "Complete SSO login: validate the IdP response, provision or re-sync the User, and establish a session"
+      description: >
+        Processes the identity-provider authentication response. On success the
+        service establishes a session (delivered to the client as a redirect with
+        a session cookie); the schema below describes the resolved session summary.
+      tags:
+        - "access"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SsoCallbackRequest"
+      responses:
+        "200":
+          description: "Authentication succeeded and a session was established"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticatedSession"
+        "401":
+          description: "The identity-provider response is invalid, expired, or tampered"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "AUTH_RESPONSE_INVALID"
+                message: "We could not verify your sign-in. Please try again."
+        "422":
+          description: "Provisioning refused — the response lacks a stable user identifier"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "PROVISIONING_MISSING_IDENTIFIER"
+                message: "We could not complete your sign-in. Please contact facility management."
+
+components:
+  schemas:
+    SsoCallbackRequest:
+      type: object
+      required:
+        - authorizationCode
+        - state
+      properties:
+        authorizationCode:
+          type: string
+          description: "The authorization code (or assertion) issued by the identity provider for this login."
+          example: "eyJ0eXAiOiJKV1QiLCJhbGciOi..."
+        state:
+          type: string
+          description: "Opaque anti-forgery token issued when login was initiated; the recorded return URL is bound to it server-side."
+          example: "s-9f2a1c7b-4e10-4d33-9a52-0c1b2d3e4f56"
+
+    AuthenticatedSession:
+      type: object
+      required:
+        - userId
+        - languagePreference
+        - firstLogin
+        - hasBookableAccess
+        - returnUrl
+      properties:
+        userId:
+          type: string
+          description: "Stable identity-provider identifier associated with the session."
+          example: "idp|okta|8a1f-employee-2231"
+        ssoRole:
+          type: string
+          nullable: true
+          description: "Current SSO role carried on the session; null when the IdP supplied no role claim."
+          example: "employee"
+        languagePreference:
+          type: string
+          enum:
+            - en
+            - nl
+          description: "User's language preference, seeded from the IdP locale claim, defaulting to English."
+          example: "nl"
+        firstLogin:
+          type: boolean
+          description: "True when this login created the User (JIT provisioning); false on a returning login."
+          example: true
+        hasBookableAccess:
+          type: boolean
+          description: "False when the session carries no SSO role, meaning no bookable-zone access until a manager grants it."
+          example: true
+        returnUrl:
+          type: string
+          description: "Internal path to redirect to after login; the recorded requested URL, or '/' when none was recorded."
+          example: "/desks?date=2026-07-27"
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002)."
+          example: "AUTH_RESPONSE_INVALID"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users."
+          example: "We could not verify your sign-in. Please try again."
+        details:
+          type: array
+          description: "Field-level detail; omitted for authentication failures."
+          items:
+            type: object
+            required:
+              - field
+              - rule
+              - message
+            properties:
+              field:
+                type: string
+                example: "authorizationCode"
+              rule:
+                type: string
+                example: "invalid"
+              message:
+                type: string
+                example: "The authentication response could not be validated."

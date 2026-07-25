@@ -1,0 +1,74 @@
+checkpoint: 1
+name: "Domain Model & Contracts"
+status: passed
+started_at: '2026-07-25T16:00:00.000Z'
+completed_at: '2026-07-25T16:10:00.000Z'
+duration_ms: 600000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 18
+  passed: 18
+  failed: 0
+  skipped: 0
+  command: "npm test (vitest run, typecheck enabled)"
+review:
+  critical: 0
+  important: 0
+  minor: 2
+  minor_1_resolved: "Added compile-time assertion binding domain Locale to contract AuthenticatedSession.languagePreference (STD-037 Rule 16)"
+  minor_2_deferred: "Error-code -> UI login-error-state mapping deferred to CP3 (response-handling layer)"
+files_touched:
+  created:
+    - src/types/contracts/uc-001.ts
+    - src/types/auth.ts
+    - src/types/__tests__/contracts.spec.ts
+    - src/types/__tests__/auth.spec.ts
+    - scripts/generate-contracts.mjs
+    - tsconfig.vitest.json
+  modified:
+    - package.json
+    - package-lock.json
+    - vitest.config.ts
+    - eslint.config.ts
+  deleted: []
+reasoning_entries: 5
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check && npm test && npm run lint"
+  exit_code: 0
+  summary: "type-check exit 0; vitest 16 passed, 0 failed, Type Errors: no errors; eslint exit 0; npm audit 0 vulnerabilities"
+  timestamp: '2026-07-25T16:10:00.000Z'
+standards_applied:
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "kebab-case files (uc-001.ts, auth.ts, generate-contracts.mjs); PascalCase types (Locale, LoginErrorState); SCREAMING_SNAKE consts (SUPPORTED_LOCALES, DEFAULT_LOCALE, LOGIN_ERROR_STATES)"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "src/types/auth.ts enumerations as named consts; CONTRACT_FILE/HEADER/OUT_DIR consts in scripts/generate-contracts.mjs"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "added openapi-typescript (used by scripts/generate-contracts.mjs); deliberately did NOT add @tanstack/vue-query — this screen makes no fetch calls (server-side SSO exchange)"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check/test/lint exit 0; src/types/contracts/** added to eslint ignore (generated code exception); js-yaml advisory resolved via override — npm audit 0 vulnerabilities"
+    deviated: false
+  - id: STD-020
+    name: "Service README"
+    where: "n/a at CP1 — README is maintained at CP5 (Deployment Topology)"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "no spec/standard IDs in source; no narration; generated uc-001.ts header is tooling-mandated (generated-code exception)"
+    deviated: false
+  - id: STD-035
+    name: "Scenario-Key Test Binding"
+    where: "CP1 type/domain tests map no Gherkin scenario, so carry no key (STD-035 Rule 6 — unkeyed foundation tests are legitimate)"
+    deviated: false
+  - id: STD-037
+    name: "Vue API Client & Query Composables"
+    where: "Rule 15/16 applied — contract types generated from .flowforge/contracts/ snapshot via openapi-typescript, dynamic scan, treated as generated. Rules 1-14 (client/composables/case-conversion) N/A — no fetch API calls in this screen"
+    deviated: false

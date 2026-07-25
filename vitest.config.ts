@@ -9,6 +9,12 @@ export default mergeConfig(
       environment: 'jsdom',
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
+      typecheck: {
+        enabled: true,
+        checker: 'vue-tsc',
+        tsconfig: './tsconfig.vitest.json',
+        include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      },
     },
   }),
 )

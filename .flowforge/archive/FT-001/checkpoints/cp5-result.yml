@@ -1,0 +1,72 @@
+checkpoint: 5
+name: "Deployment Topology"
+status: passed
+started_at: '2026-07-25T16:42:00.000Z'
+completed_at: '2026-07-25T16:45:00.000Z'
+duration_ms: 180000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 98
+  passed: 98
+  failed: 0
+  skipped: 0
+  command: "npm run build (type-check + build-only + postbuild budget) && npm test && npm run lint && npm audit"
+files_touched:
+  created:
+    - scripts/check-bundle-budget.mjs
+  modified:
+    - package.json
+    - README.md
+  deleted: []
+reasoning_entries: 3
+tdd_compliance: true
+verification_evidence:
+  command: "npm run build && npm test && npm run lint && npm audit --audit-level=high"
+  exit_code: 0
+  summary: "build exit 0 — total JS 35.2 KB gzipped < 200 KB budget, budget OK; vitest 98 passed, 0 failed, 0 type errors; eslint exit 0; npm audit 0 vulnerabilities"
+  timestamp: '2026-07-25T16:45:00.000Z'
+deployment:
+  build: "vite build — app compiles; type-check gates the build (run-p type-check build-only)"
+  bundle_budget: "repo-owned build-time gate scripts/check-bundle-budget.mjs, wired as postbuild + check:bundle; total 35.2 KB gzip, chunks index 33.3 KB / login-view 1.9 KB — all under STD-005 budgets (200 KB total, 50 KB per chunk)"
+  ci: "hub-generated quality-gates.yml NOT hand-edited (cardinal rule — generated CI infra); the Node path already runs lint/test/audit/license/SAST/secretlint; bundle budget enforced repo-side via the build gate"
+  regression: "full CP1-CP5 suite green (98 passed) on combined output; after final three-lens review fixes, 104 passed"
+final_review:
+  lenses: [traceability, security, standards]
+  critical: 0
+  important: 0
+  minor: 12
+  outcome: "PROCEED from all three lenses. Applied in-repo: toast dismiss label routed through i18n (EN/NL) + z-index named var (--z-toast); coverage assertions added (login-path toast message, missing_identifier render, detectLocale browser-locale seeding); STD-032 hygiene (test describe UC-id removed, eslint dead-comment block removed). Recorded as deviations/gaps (fix upstream, not hand-patched): STD-036 Rule 7 typography tokens absent from the design system (CP4). Confirmed no action: idp_unreachable wire-format (INT-006, upstream), returnUrl defense-in-depth (UC-003 owns validation), npm audit gate (already in CI static-analysis stage)."
+standards_applied:
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "scripts/check-bundle-budget.mjs — camelCase functions, SCREAMING_SNAKE budget consts"
+    deviated: false
+  - id: STD-005
+    name: "Performance Budgets"
+    where: "Rule 10/11/15 — JS bundle budget enforced at build time (postbuild gate), violations fail the production build. Total 35.2 KB gzip. Web-vitals synthetic (Lighthouse) check is owned by hub CI, not added in-repo (static login page trivially meets LCP/CLS)"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "BYTES_PER_KB, TOTAL_JS_GZIP_BUDGET_BYTES, PER_CHUNK_GZIP_BUDGET_BYTES named consts"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "bundle-budget script uses node builtins (fs, zlib, path) — no new dependency"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "build/test/lint exit 0; npm audit 0 vulnerabilities"
+    deviated: false
+  - id: STD-020
+    name: "Service README"
+    where: "README.md rewritten with Overview, Prerequisites, Getting Started, Profiles/Environments, Environment Variables (VITE_SSO_LOGIN_PATH), Running Tests"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "scripts + README carry no spec/standard IDs; script comments explain only non-obvious intent"
+    deviated: false
+  - id: STD-035
+    name: "Scenario-Key Test Binding"
+    where: "n/a at CP5 — no new scenario tests; full regression re-run"
+    deviated: false

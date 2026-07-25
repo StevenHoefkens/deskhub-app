@@ -1,0 +1,237 @@
+format_version: "1.0"
+feature: "FT-001"
+agent_runtime: "claude-code"
+model: "claude-opus-4-8"
+generated_at: "2026-07-25T16:55:00.000Z"
+entries:
+  - id: "INT-001"
+    checkpoint: 1
+    type: "deviation"
+    subject: "openapi-typescript peer-range vs TypeScript 6"
+    decision: "Added openapi-typescript (devDep) and resolved its typescript@^5.x peer via npm override (openapi-typescript.typescript: $typescript), keeping the repo's TS 6.0."
+    reasoning: "STD-037 Rule 15 mandates generating contract types with openapi-typescript, but its latest release peers TS 5.x while the scaffold pins TS ~6.0. Empirically verified generation and vue-tsc typecheck pass under TS 6; a clean npm install (no --legacy-peer-deps) succeeds with the override. Matches the repo's established advisory-override pattern."
+    risk: "medium"
+    spec_ref: "UC-001 contract (consumed)"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected: ["package.json", "scripts/generate-contracts.mjs"]
+  - id: "INT-002"
+    checkpoint: 1
+    type: "deviation"
+    subject: "js-yaml transitive DoS advisory"
+    decision: "Pinned js-yaml to ^4.3.0 via npm override to clear a high-severity advisory pulled in transitively by @redocly/openapi-core."
+    reasoning: "Dev-only, and the tool parses only our trusted contract snapshot, so exploitability is nil — but the repo's convention is to resolve advisories via override (cf. brace-expansion). 4.3.0 is the same major @redocly peers, so no breakage; npm audit reports 0 vulnerabilities."
+    risk: "low"
+    spec_ref: null
+    standard_ref: "STD-019"
+    spec_gap: false
+    files_affected: ["package.json"]
+  - id: "INT-003"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "No runtime API client for the consumed UC-001 contract"
+    decision: "Generated the contract types (STD-037 Rule 15) but did not build an apiClient/TanStack-Query composable; the types are consumed by a compile-time conformance test."
+    reasoning: "The contract describes the callback as delivered via server-side redirect + session cookie; this screen performs no fetch of POST /auth/sso/callback. STD-037 Rules 1-14 are therefore N/A; Rule 16 conformance is the compile-time typed-contract check. Avoids a speculative @tanstack/vue-query dependency (STD-018)."
+    risk: "medium"
+    spec_ref: "UC-001 contract.openapi.yml"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected: ["src/types/contracts/uc-001.ts", "src/types/__tests__/contracts.spec.ts"]
+  - id: "INT-004"
+    checkpoint: 1
+    type: "alternative_rejected"
+    subject: "enum object vs string-literal union for languagePreference"
+    decision: "Generated the contract types with the default (string-literal union 'en' | 'nl') rather than openapi-typescript's enum:true (which emits an enum object)."
+    reasoning: "A union is simpler for a consumer and lets the domain Locale type bind to it directly via expectTypeOf; an enum object would not equal the union."
+    risk: "low"
+    spec_ref: "AuthenticatedSession.languagePreference"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected: ["scripts/generate-contracts.mjs", "src/types/contracts/uc-001.ts"]
+  - id: "INT-005"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "LoginErrorState vocabulary sourced from the screen, not the contract"
+    decision: "Defined LoginErrorState as idp_unreachable | access_denied | missing_identifier (from SCR-001), distinct from the contract's Error.code values."
+    reasoning: "The screen defines its own error-state vocabulary for the UI; the contract codes are a separate, backend-facing set. Rendering is keyed off the screen states."
+    risk: "low"
+    spec_ref: "SCR-001 login-error section"
+    standard_ref: null
+    spec_gap: false
+    files_affected: ["src/types/auth.ts"]
+  - id: "INT-006"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Backend error indicator -> UI login-error-state mapping"
+    decision: "resolveLoginErrorState maps AUTH_RESPONSE_INVALID->access_denied and PROVISIONING_MISSING_IDENTIFIER->missing_identifier, passes through canonical state names, and returns null otherwise. idp_unreachable has no contract code (transport failure)."
+    reasoning: "The backend redirects failed auth to /login?error=<code>, but neither the query-param wire format nor the code->state mapping is specified anywhere. Chosen a defensible total function; kept prototype-safe (Map + allowlist) against untrusted input."
+    risk: "medium"
+    spec_ref: "SCR-001 login-error; UC-001 contract Error codes"
+    standard_ref: "STD-039"
+    spec_gap: true
+    files_affected: ["src/lib/login-error.ts"]
+  - id: "INT-007"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Locale defaulting algorithm"
+    decision: "resolveInitialLocale takes the first browser-language candidate whose primary subtag (case-insensitive) is supported, else English."
+    reasoning: "SCR-001 LocaleToggle: 'defaults to browser locale, English fallback'. Primary-subtag match handles region-qualified tags (nl-NL -> nl)."
+    risk: "low"
+    spec_ref: "SCR-001 LocaleToggle"
+    standard_ref: null
+    spec_gap: false
+    files_affected: ["src/lib/locale.ts"]
+  - id: "INT-008"
+    checkpoint: 3
+    type: "assumption"
+    subject: "SSO login-initiation path is configuration, not contract"
+    decision: "Sign-in performs a full-page redirect to SSO_LOGIN_PATH (env VITE_SSO_LOGIN_PATH, default /auth/sso/login), carrying an encoded returnUrl."
+    reasoning: "The UC-001 contract defines only the callback; the login-initiation endpoint (flow.mermaid 'Initiate login') is absent from any contract. Treated as operator configuration."
+    risk: "medium"
+    spec_ref: "UC-001 flow.mermaid; contract.openapi.yml"
+    standard_ref: "STD-017"
+    spec_gap: true
+    files_affected: ["src/config/auth.ts", "src/composables/use-sso-login.ts"]
+  - id: "INT-009"
+    checkpoint: 3
+    type: "assumption"
+    subject: "Root path redirects to /login"
+    decision: "Router redirects / to /login."
+    reasoning: "App home is unspecified for FT-001; an unauthenticated default of the login page is reasonable. Flagged: once an authenticated landing/route guard exists, this and the default returnUrl='/' must be reconciled to avoid a post-login loop."
+    risk: "low"
+    spec_ref: "SCR-001 route"
+    standard_ref: "STD-040"
+    spec_gap: true
+    files_affected: ["src/router/index.ts"]
+  - id: "INT-010"
+    checkpoint: 3
+    type: "interpretation"
+    subject: "returnUrl forwarded without frontend validation"
+    decision: "returnUrl is encodeURIComponent-escaped and forwarded to the same-origin SSO init path; no open-redirect validation on the frontend."
+    reasoning: "constraints.md assigns return-URL validation / open-redirect protection to UC-003 (backend, bound to anti-forgery state). The frontend is not a redirect sink (it only navigates to a fixed relative path), so it must not duplicate that authoritative check."
+    risk: "low"
+    spec_ref: "UC-001 constraints.md; UC-003"
+    standard_ref: null
+    spec_gap: false
+    files_affected: ["src/composables/use-sso-login.ts", "src/composables/use-login-error.ts"]
+  - id: "INT-011"
+    checkpoint: 3
+    type: "deviation"
+    subject: "Removed create-vue demo scaffold"
+    decision: "Deleted HelloWorld/TheWelcome/WelcomeItem/icons and HelloWorld.spec when wiring the router into App.vue/main.ts."
+    reasoning: "Introducing routing made the demo components unreachable dead code; removed to keep the tree clean (STD-018 spirit)."
+    risk: "low"
+    spec_ref: null
+    standard_ref: "STD-018"
+    spec_gap: false
+    files_affected: ["src/App.vue", "src/main.ts"]
+  - id: "INT-012"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Custom lightweight i18n instead of a library"
+    decision: "Implemented EN/NL i18n as a small useI18n composable + static message catalog, no vue-i18n dependency."
+    reasoning: "i18n is not a design-system component/notify surface (not in the inventory), so choosing it is not an improvised realization; a 2-locale login page needs no i18n framework. Avoids a speculative dependency (STD-018)."
+    risk: "low"
+    spec_ref: "SCR-001 (localized EN/NL)"
+    standard_ref: "STD-018"
+    spec_gap: false
+    files_affected: ["src/lib/i18n/use-i18n.ts", "src/lib/i18n/messages.ts"]
+  - id: "INT-013"
+    checkpoint: 4
+    type: "assumption"
+    subject: "Dutch (NL) copy authored"
+    decision: "Authored NL translations for all login-page strings; English copy taken from SCR-001/contract examples."
+    reasoning: "The screen requires NL localization but the spec supplies no NL copy. Authored reasonable translations; these should be content-reviewed by a native/product owner before release."
+    risk: "medium"
+    spec_ref: "SCR-001"
+    standard_ref: null
+    spec_gap: true
+    files_affected: ["src/lib/i18n/messages.ts"]
+  - id: "INT-014"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Toast realization + inventory contract mismatch"
+    decision: "Built the toast as one shared custom module at @/lib/toast (store + useToast + ToastHost) per the inventory impl (kind: custom); behaviour follows STD-039 Rule 18 (success/error, user-facing messages, default 4000ms, mounted once, invoked from feature)."
+    reasoning: "The inventory pins toast realization to a custom module, but its contract/pattern reference STD-012 resolves to the Next.js component-patterns standard (a neutral-skeleton placeholder), not a toast behaviour contract. Used STD-039 Rule 18 as the authoritative Vue toast contract. Reconciled the module path to the inventory's @/lib/toast (STD-038's example @/composables/use-toast is illustrative, not binding)."
+    risk: "low"
+    spec_ref: "design-system inventory (toast); SCR-001 orchestration notify"
+    standard_ref: "STD-039"
+    spec_gap: true
+    files_affected: ["src/lib/toast/toast-store.ts", "src/lib/toast/use-toast.ts", "src/lib/toast/toast-host.vue"]
+  - id: "INT-015"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Toast/alert styling with neutral tokens"
+    decision: "Error toast and login-error alert are styled with color-surface-alt + color-border (neutral), not a danger colour."
+    reasoning: "No color-danger/color-success semantic tokens exist; SCR-001 already pins the same neutral interim binding for its error surfaces. Bound to the tokens that exist."
+    risk: "low"
+    spec_ref: "SCR-001 (interim binding notes)"
+    standard_ref: "STD-036"
+    spec_gap: true
+    files_affected: ["src/lib/toast/toast-host.vue", "src/components/auth/login-error-alert/login-error-alert.vue"]
+  - id: "INT-016"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Toast raised on mount when an error is present"
+    decision: "login-form fires toast.error (duration 5000ms) in onMounted when errorState is present, alongside the inline alert."
+    reasoning: "SCR-001 orchestration on_error = show login-error + notify toast; a failed login lands back on /login?error=..., so the error is present at page load. 5000ms and the message text come from the screen spec."
+    risk: "low"
+    spec_ref: "SCR-001 orchestration on_error"
+    standard_ref: "STD-039"
+    spec_gap: false
+    files_affected: ["src/components/auth/login-form/login-form.vue"]
+  - id: "INT-017"
+    checkpoint: 4
+    type: "deviation"
+    subject: "Typography not tokenized (STD-036 Rule 7)"
+    decision: "font-weight:700 (locale-toggle active) and font-family:system-ui (global body) are literal values, not design tokens."
+    reasoning: "The compiled token set defines only colour/spacing/radius — no typography tokens exist to bind to. Per fix-upstream (ADR-0002/0017) the remedy is to add typography tokens to the design-system layers and regenerate, not to hand-invent a token in code."
+    risk: "medium"
+    spec_ref: "design-system token layers"
+    standard_ref: "STD-036"
+    spec_gap: true
+    files_affected: ["src/components/shared/ui/locale-toggle/locale-toggle.vue", "src/assets/main.css"]
+  - id: "INT-018"
+    checkpoint: 5
+    type: "deviation"
+    subject: "Bundle budget enforced repo-side, not in the generated CI"
+    decision: "Added a repo-owned build-time budget gate (scripts/check-bundle-budget.mjs, wired as postbuild) instead of editing quality-gates.yml."
+    reasoning: "quality-gates.yml is hub-generated CI infrastructure with managed regions; the cardinal rule forbids hand-patching generated artifacts. A build-time gate enforces STD-005 Rule 15 wherever the build runs."
+    risk: "low"
+    spec_ref: null
+    standard_ref: "STD-005"
+    spec_gap: false
+    files_affected: ["scripts/check-bundle-budget.mjs", "package.json"]
+  - id: "INT-019"
+    checkpoint: 5
+    type: "interpretation"
+    subject: "Web-vitals synthetic check not added in-repo"
+    decision: "Implemented only the enforceable JS bundle-size budget (STD-005 Rule 10/11); no Lighthouse/Web-Vitals synthetic CI check added in-repo."
+    reasoning: "Synthetic Web-Vitals checks are owned by the hub CI; the static login page trivially meets LCP/FID/CLS. Only the build-time bundle budget is a repo-ownable MUST."
+    risk: "low"
+    spec_ref: null
+    standard_ref: "STD-005"
+    spec_gap: false
+    files_affected: ["scripts/check-bundle-budget.mjs"]
+  - id: "INT-021"
+    checkpoint: 5
+    type: "deviation"
+    subject: "returnUrl defense-in-depth guard added after code review"
+    decision: "Added safeInternalPath (src/lib/url.ts): signIn now forwards returnUrl only if it is a single-slash internal path, else falls back to home. Rejects //host, /\\host, scheme URLs, and non-slash-prefixed values."
+    reasoning: "Two independent reviewers flagged the forwarded returnUrl. The frontend is not itself an open-redirect sink (it only navigates to the fixed same-origin SSO_LOGIN_PATH), and UC-003 owns the authoritative state-bound return-URL validation — but a cheap format guard fails fast on hostile values without duplicating that check. Layered hardening, not a replacement for UC-003."
+    risk: "low"
+    spec_ref: "UC-001 constraints.md; UC-003"
+    standard_ref: null
+    spec_gap: false
+    files_affected: ["src/lib/url.ts", "src/composables/use-sso-login.ts"]
+  - id: "INT-020"
+    checkpoint: 5
+    type: "assumption"
+    subject: "Compiled tokens.css is committed"
+    decision: "src/assets/tokens.css (output of ie design-system compile) is committed rather than gitignored."
+    reasoning: "It is a build input imported by main.css, and CI has no design-system compile step; committing it keeps the build reproducible. A restyle re-runs compile and re-commits."
+    risk: "low"
+    spec_ref: null
+    standard_ref: null
+    spec_gap: false
+    files_affected: ["src/assets/tokens.css"]

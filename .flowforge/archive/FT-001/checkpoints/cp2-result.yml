@@ -1,0 +1,69 @@
+checkpoint: 2
+name: "Domain Logic & Rules"
+status: passed
+started_at: '2026-07-25T16:15:00.000Z'
+completed_at: '2026-07-25T16:18:00.000Z'
+duration_ms: 180000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 46
+  passed: 46
+  failed: 0
+  skipped: 0
+  command: "npm test (vitest run, typecheck enabled)"
+review:
+  critical: 0
+  important: 2
+  minor: 1
+  important_1_fixed: "resolveLoginErrorState used `in` operator on an object, traversing the prototype chain on untrusted URL input (e.g. 'toString' leaked an inherited function). Fixed: replaced object with a prototype-free Map + get(); added regression test for inherited keys"
+  important_2_flagged: "Backend->frontend error query-param wire format + contract-code->UI-state mapping is a genuine spec gap (INT-006). Code kept (defensible total function); flagged upstream for SCR-001/UC-001 contract decision (ADR-0002)"
+  minor_1_fixed: "Added missing_identifier message-key assertion and pass-through cases for all canonical state names"
+files_touched:
+  created:
+    - src/lib/locale.ts
+    - src/lib/login-error.ts
+    - src/lib/__tests__/locale.spec.ts
+    - src/lib/__tests__/login-error.spec.ts
+  modified: []
+  deleted: []
+reasoning_entries: 2
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check && npm test && npm run lint"
+  exit_code: 0
+  summary: "type-check exit 0; vitest 44 passed, 0 failed, Type Errors: no errors; eslint exit 0"
+  timestamp: '2026-07-25T16:18:00.000Z'
+standards_applied:
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "kebab-case files (locale.ts, login-error.ts); verb-first camelCase functions (resolveInitialLocale, resolveLoginErrorState, loginErrorMessageKey); boolean is-prefix (isRetryableLoginError); SCREAMING_SNAKE consts"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "SUBTAG_SEPARATOR, MESSAGE_KEY_PREFIX, RETRYABLE_STATE, CONTRACT_CODE_TO_STATE named consts — no inline literals in logic"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "no new dependencies added at CP2"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check/test/lint exit 0"
+    deviated: false
+  - id: STD-020
+    name: "Service README"
+    where: "n/a at CP2 — README maintained at CP5"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "src/lib/locale.ts, src/lib/login-error.ts carry no comments; no spec/standard IDs; names carry intent"
+    deviated: false
+  - id: STD-035
+    name: "Scenario-Key Test Binding"
+    where: "CP2 tests verify SCR-001 screen behavior, not owned Gherkin scenarios (UC-001 is upstream_dependency) — unkeyed per Rule 6"
+    deviated: false
+  - id: STD-039
+    name: "Vue Component Composition Patterns"
+    where: "Rule 19 (config-driven mapping via static object keyed by enum, graceful null on miss) applied to CONTRACT_CODE_TO_STATE in login-error.ts; component-tier rules apply at CP4"
+    deviated: false
