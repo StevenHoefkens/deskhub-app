@@ -1,0 +1,11 @@
+:root {
+  --color-border: #F3F4F6;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F9FAFB;
+  --color-text: #111827;
+  --color-text-muted: #6B7280;
+  --radius-card: 8px;
+  --spacing-lg: 24px;
+  --spacing-md: 16px;
+  --spacing-sm: 8px;
+}

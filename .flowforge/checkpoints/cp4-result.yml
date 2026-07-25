@@ -1,0 +1,111 @@
+checkpoint: 4
+name: "Presentation"
+status: passed
+started_at: '2026-07-25T16:30:00.000Z'
+completed_at: '2026-07-25T16:42:00.000Z'
+duration_ms: 720000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 98
+  passed: 98
+  failed: 0
+  skipped: 0
+  command: "npm test (vitest run, typecheck enabled)"
+files_touched:
+  created:
+    - src/assets/tokens.css
+    - src/lib/i18n/messages.ts
+    - src/lib/i18n/use-i18n.ts
+    - src/lib/i18n/__tests__/use-i18n.spec.ts
+    - src/lib/toast/toast-store.ts
+    - src/lib/toast/use-toast.ts
+    - src/lib/toast/toast-host.vue
+    - src/lib/toast/index.ts
+    - src/lib/toast/__tests__/toast.spec.ts
+    - src/components/shared/ui/locale-toggle/locale-toggle.vue
+    - src/components/shared/ui/locale-toggle/locale-toggle.spec.ts
+    - src/components/auth/login-error-alert/login-error-alert.vue
+    - src/components/auth/login-error-alert/login-error-alert.spec.ts
+    - src/components/auth/login-form/login-form.spec.ts
+  modified:
+    - src/components/auth/login-form/login-form.vue
+    - src/views/auth/login-view.vue
+    - src/App.vue
+    - src/assets/main.css
+  deleted:
+    - src/assets/base.css
+reasoning_entries: 5
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check && npm test && npm run lint"
+  exit_code: 0
+  summary: "type-check exit 0; vitest 98 passed, 0 failed, Type Errors: no errors; eslint exit 0"
+  timestamp: '2026-07-25T16:42:00.000Z'
+design_system:
+  tokens_compiled: "ie design-system compile --app deskhub-app -> src/assets/tokens.css (9 semantic tokens)"
+  token_binding: "every SCR-001 component-tree token bound verbatim to var(--token); interim surface-alt/border bindings for color-primary/color-danger applied exactly as the screen spec pins them"
+  realization:
+    toast: "inventory impl kind=custom module=@/lib/toast -> generated one shared module (store + useToast + ToastHost); behaviour per STD-039 Rule 18"
+debugging:
+  - symptom: "vue-tsc: LocaleToggle prop ariaLabel missing when bound via :aria-label"
+    root_cause: "vue-tsc types aria-* as native attribute passthrough, not the component prop, so the prop stayed unfilled"
+    fix: "renamed the prop to `label`; component sets aria-label from it (avoids the aria-* special-attr clash)"
+standards_applied:
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "kebab-case files/dirs; multi-word PascalCase components (LocaleToggle, LoginErrorAlert, LoginForm, LoginView, ToastHost); SCREAMING_SNAKE consts"
+    deviated: false
+  - id: STD-005
+    name: "Performance Budgets"
+    where: "consulted (verified holistically at CP5) — no above-the-fold images, immediate interaction feedback (Rule 7); bundle budget enforced at CP5"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "LOGIN_ERROR_TOAST_DURATION_MS, DEFAULT_TOAST_DURATION_MS named; display strings in i18n catalog; token values only via CSS vars"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "custom i18n (no vue-i18n) and custom toast (per inventory impl) — no new runtime dependencies added at CP4"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check/test/lint exit 0; resolved a vue-tsc prop-typing error (LocaleToggle label)"
+    deviated: false
+  - id: STD-020
+    name: "Service README"
+    where: "n/a at CP4 — README updated at CP5"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "SCR-001's interim-binding comments deliberately NOT copied into code; no spec/standard IDs, no narration in any component"
+    deviated: false
+  - id: STD-035
+    name: "Scenario-Key Test Binding"
+    where: "component tests verify SCR-001 screen behavior (not owned Gherkin scenarios — UC-001 upstream) — unkeyed per Rule 6"
+    deviated: false
+  - id: STD-036
+    name: "Vue Component Structure"
+    where: "tiers: view (login-view), feature (login-form owns composables), ui (locale-toggle, login-error-alert — pure, props-in/emits-out); domain dirs; co-located tests; multi-word names; colour/spacing/radius via CSS var(--token)"
+    deviated: true
+    deviation_reason: "Rule 7 typography-via-tokens: the compiled token set (tokens.css) defines only colour/spacing/radius — no typography tokens exist. font-weight:700 (locale-toggle active state) and font-family:system-ui (global body) could not be bound to a token. Fix is upstream — add typography tokens to the design-system layers and regenerate (ADR-0002/0017), not hand-invent a token here. Tracked as a spec gap."
+  - id: STD-037
+    name: "Vue API Client & Query Composables"
+    where: "Rule 16 compile-time conformance holds; Rules 1-14 N/A (no fetch — server-side SSO redirect flow)"
+    deviated: false
+  - id: STD-038
+    name: "Vue Form State & Validation Patterns"
+    where: "field-validation rules N/A — SSO screen has no data-entry form (single action button, no fields); error display uses role=alert + aria-live=assertive (Rule 12/13 accessibility) in LoginErrorAlert"
+    deviated: false
+  - id: STD-039
+    name: "Vue Component Composition Patterns"
+    where: "typed defineProps/defineEmits; variant union (ToastVariant); ui pure (Rule 5); feature owns side effects toast+redirect (Rule 9); toast contract Rule 18 (success/error, user-facing, default 4000ms, mounted once, invoked from feature); no spec-mapping comments (Rule 11)"
+    deviated: false
+  - id: STD-040
+    name: "Vue View & Routing Structure"
+    where: "login-view is a thin entry delegating to the feature component (Rules 2,3,7); responsive centered container with narrow max-width for a form/auth page (Rule 5); lazy-loaded route (CP3)"
+    deviated: false
+  - id: "CONSTRAINT-no-local-credential-path"
+    name: "UC-001 constraints.md — no local credential path"
+    where: "login page offers SSO sign-in only; no username/password field rendered anywhere"
+    deviated: false

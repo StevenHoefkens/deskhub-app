@@ -1,0 +1,104 @@
+checkpoint: 3
+name: "Interface Layer"
+status: passed
+started_at: '2026-07-25T16:25:00.000Z'
+completed_at: '2026-07-25T16:28:00.000Z'
+duration_ms: 180000
+attempts: 2
+max_attempts: 3
+test_summary:
+  total: 58
+  passed: 58
+  failed: 0
+  skipped: 0
+  command: "npm test (vitest run, typecheck enabled)"
+files_touched:
+  created:
+    - src/config/auth.ts
+    - src/composables/use-sso-login.ts
+    - src/composables/use-login-error.ts
+    - src/composables/__tests__/use-sso-login.spec.ts
+    - src/composables/__tests__/use-login-error.spec.ts
+    - src/router/index.ts
+    - src/router/__tests__/router.spec.ts
+    - src/views/auth/login-view.vue
+    - src/components/auth/login-form/login-form.vue
+  modified:
+    - src/main.ts
+    - src/App.vue
+    - env.d.ts
+    - package.json
+    - package-lock.json
+  deleted:
+    - src/components/HelloWorld.vue
+    - src/components/TheWelcome.vue
+    - src/components/WelcomeItem.vue
+    - src/components/__tests__/HelloWorld.spec.ts
+    - src/components/icons/IconCommunity.vue
+    - src/components/icons/IconDocumentation.vue
+    - src/components/icons/IconEcosystem.vue
+    - src/components/icons/IconSupport.vue
+    - src/components/icons/IconTooling.vue
+reasoning_entries: 4
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check && npm test && npm run lint"
+  exit_code: 0
+  summary: "type-check exit 0; vitest 58 passed, 0 failed, Type Errors: no errors; eslint exit 0"
+  timestamp: '2026-07-25T16:28:00.000Z'
+debugging:
+  - symptom: "vi.spyOn(window.location,'assign') threw 'Cannot redefine property: assign'"
+    root_cause: "jsdom marks location.assign non-configurable; spy cannot redefine the method"
+    fix: "test stubs the whole window.location object (test-harness fix; production code unchanged)"
+  - symptom: "router.resolve('/').fullPath was '/' not '/login'"
+    root_cause: "vue-router resolve() does not execute redirects — only navigation (push) applies them"
+    fix: "test navigates with push then asserts currentRoute (test fix; router redirect config correct)"
+standards_applied:
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "kebab-case files (use-sso-login.ts, login-view.vue, login-form.vue); PascalCase components (LoginForm, LoginView); SCREAMING_SNAKE config consts; multi-word component names (Vue style guide)"
+    deviated: false
+  - id: STD-005
+    name: "Performance Budgets"
+    where: "consulted (CP5 primary) — sign-in is an instant full-page redirect, no blocking fetch; interaction feedback immediate (Rule 7)"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "src/config/auth.ts — SSO_LOGIN_PATH, HOME_PATH, LOGIN_ROUTE_PATH, RETURN_URL_QUERY_KEY, ERROR_QUERY_KEY named; SSO path from env (Rule 5)"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "added vue-router (used by src/router/index.ts); removed create-vue demo components obsoleted by routing"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check/test/lint exit 0; VITE_SSO_LOGIN_PATH typed in env.d.ts (no implicit any)"
+    deviated: false
+  - id: STD-020
+    name: "Service README"
+    where: "n/a at CP3 — README + new env var (VITE_SSO_LOGIN_PATH) documented at CP5"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "no spec/standard IDs or narration in router, composables, views, or components"
+    deviated: false
+  - id: STD-035
+    name: "Scenario-Key Test Binding"
+    where: "CP3 integration tests exercise SCR-001 login-page interface behavior, not owned Gherkin scenarios (UC-001 upstream) — unkeyed per Rule 6"
+    deviated: false
+  - id: STD-036
+    name: "Vue Component Structure"
+    where: "tiered layout established — view (src/views/auth/login-view.vue), feature (src/components/auth/login-form/login-form.vue); feature owns composables, view delegates"
+    deviated: false
+  - id: STD-037
+    name: "Vue API Client & Query Composables"
+    where: "Rule 16 compile-time conformance holds (typed generated contract). Rules 1-14 N/A — no fetch; the SSO exchange is a server-side redirect flow"
+    deviated: false
+  - id: STD-039
+    name: "Vue Component Composition Patterns"
+    where: "feature component (login-form) owns useSsoLogin/useLoginError and side effects; view holds no logic (Rules 6-10)"
+    deviated: false
+  - id: STD-040
+    name: "Vue View & Routing Structure"
+    where: "central router (src/router/index.ts) lazy-loads the view (Rule 1); login-view is a thin entry delegating to the feature component (Rules 2,3,7)"
+    deviated: false

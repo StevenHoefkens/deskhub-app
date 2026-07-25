@@ -6,15 +6,22 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
+    "postbuild": "node scripts/check-bundle-budget.mjs",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
+    "generate:contracts": "node scripts/generate-contracts.mjs",
+    "prebuild": "npm run generate:contracts",
+    "pretype-check": "npm run generate:contracts",
+    "pretest": "npm run generate:contracts",
     "test": "vitest run",
     "test:unit": "vitest",
     "lint": "eslint ."
   },
   "dependencies": {
-    "vue": "^3.5.40"
+    "vue": "^3.5.40",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",
@@ -29,6 +36,7 @@
     "jiti": "^2.7.0",
     "jsdom": "^29.1.1",
     "npm-run-all2": "^9.0.2",
+    "openapi-typescript": "^7.13.0",
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.65.0",
     "vite": "^8.1.5",
@@ -40,6 +48,10 @@
     "node": "^22.18.0 || >=24.12.0"
   },
   "overrides": {
-    "brace-expansion": "^5.0.8"
+    "brace-expansion": "^5.0.8",
+    "js-yaml": "^4.3.0",
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }
