@@ -1,0 +1,15 @@
+#!/bin/sh
+# Git pre-push hook — the runtime-agnostic local quality gate (ADR-0069).
+# Activated by `ie init` via: git config core.hooksPath .githooks
+#
+# Delegates to the cross-platform `ie hook pre-push` (Node — works on
+# Windows/macOS/Linux without a POSIX shell). Skips silently if the ie CLI is
+# not installed, so a missing tool never blocks a push.
+
+if command -v ie >/dev/null 2>&1; then
+  ie hook pre-push
+  exit $?
+fi
+
+echo "ie CLI not found on PATH — skipping pre-push checks" >&2
+exit 0

@@ -1,0 +1,19 @@
+{
+  "cli_version": "0.18.0",
+  "synced_at": "2026-07-25T09:43:56.996Z",
+  "managed_targets": [
+    ".github/workflows",
+    "docs",
+    ".claude/commands/ie",
+    ".claude/agents",
+    ".githooks"
+  ],
+  "files": {
+    ".github/workflows/quality-gates.yml": "62d692b680429b6371c1b8d8b74b08dd4382c9c1d55c3644ab00c744c1bf5a9f",
+    "docs/WORKFLOW.md": "3071909907e99971d27631a575946a381dac5fe59277452e10438fc83dd0deaa",
+    ".claude/commands/ie/bug-report.md": "87dfcf2a5d5a406bd109788d797a32567d2ba05746ec77aee268d65dda87c33f",
+    ".claude/commands/ie/generate.md": "2face8b476ac2b75216b0e8424e31338e29c977b803ef83d73219bbc7bec53d8",
+    ".claude/agents/review-checkpoint.md": "818ff0aa9b4b19328c9619a087041cc3a678dda91104d8c0d1d7cbdfa7f104e5",
+    ".githooks/pre-push": "5490fd2c4c1e3aa8d7c9f1199b6d4410c2fe8fc3b363170836a22bda2524ecb3"
+  }
+}
