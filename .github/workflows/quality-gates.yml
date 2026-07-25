@@ -1,0 +1,1558 @@
+# =============================================================================
+# Quality Gates — Code Repo CI/CD Pipeline (Phase 7)
+# =============================================================================
+# Runs 6 stages on every PR to main. Stages 1-4 are blocking (PR cannot merge
+# if they fail). Stage 5 is non-blocking (standards evolution alerts per
+# ADR-0013). Stage 6 always runs to generate the compliance report.
+#
+# Supports both Java/Maven and Node.js/npm tech stacks via auto-detection.
+#
+# CI configuration (setup steps: code-repo WORKFLOW.md → "CI configuration"):
+#   PRODUCT_HUB_TOKEN     (secret)   — read the product-hub + dispatch ci-passed.
+#                                      Classic PAT, repo scope. Dispatch has no fallback.
+#   IE_CLI_PACKAGES_TOKEN (secret)   — install @rp-flow/ie-cli for spec-drift (cross-org).
+#                                      Classic PAT, read:packages. Falls back to GITHUB_TOKEN same-org.
+#   PRODUCT_HUB_REPO      (variable) — hub owner/name for legacy manifests with no
+#                                      product_hub_remote. Falls back to {owner}/product-hub.
+#   SPEC_DRIFT_BLOCKING   (variable) — set true to fail on spec drift (default: warn-only).
+#
+# References:
+#   - ADR-0013: Standards evolution (Stage 5 non-blocking)
+#   - ADR-0030: Pipeline technology stack (GitHub Actions + git-native state)
+#   - ADR-0032: Three-touchpoint engineer flow (ci-passed dispatch)
+# =============================================================================
+
+name: Quality Gates
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  PRODUCT_HUB_REPO: ${{ vars.PRODUCT_HUB_REPO || format('{0}/product-hub', github.repository_owner) }}
+
+jobs:
+  # ===========================================================================
+  # Detect — Tech stack auto-detection
+  # ===========================================================================
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      tech_stack: ${{ steps.detect.outputs.tech_stack }}
+      build_tool: ${{ steps.detect.outputs.build_tool }}
+      has_e2e: ${{ steps.detect.outputs.has_e2e }}
+      service_type: ${{ steps.detect.outputs.service_type }}
+      has_docker: ${{ steps.detect.outputs.has_docker }}
+      feature_id: ${{ steps.detect.outputs.feature_id }}
+      manifest_path: ${{ steps.detect.outputs.manifest_path }}
+      hub_slug: ${{ steps.detect.outputs.hub_slug }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect tech stack and metadata
+        id: detect
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # Tech stack detection. pom.xml is checked first (a repo carrying
+          # both build systems prefers Maven); build files beat package.json
+          # so a Gradle service with a stray package.json still tests as Java.
+          # A Gradle repo previously fell through to "unknown" and every JVM
+          # gate silently skipped, producing falsely-green CI.
+          # BEGIN IE STACK DETECTION (exercised by quality-gates-stack-detection.test.ts)
+          if [ -f "pom.xml" ]; then
+            echo "tech_stack=java" >> "$GITHUB_OUTPUT"
+            echo "build_tool=maven" >> "$GITHUB_OUTPUT"
+          elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+            echo "tech_stack=java" >> "$GITHUB_OUTPUT"
+            echo "build_tool=gradle" >> "$GITHUB_OUTPUT"
+          elif [ -f "package.json" ]; then
+            echo "tech_stack=node" >> "$GITHUB_OUTPUT"
+            echo "build_tool=npm" >> "$GITHUB_OUTPUT"
+          else
+            echo "tech_stack=unknown" >> "$GITHUB_OUTPUT"
+            echo "build_tool=none" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Co-located E2E suite discovery (STD-035): the repo-owned test:e2e
+          # script is the single source of truth — no registry fact.
+          if [ -f "package.json" ] && grep -q '"test:e2e"' package.json; then
+            echo "has_e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_e2e=false" >> "$GITHUB_OUTPUT"
+          fi
+          # END IE STACK DETECTION
+
+          # Dockerfile detection
+          if [ -f "Dockerfile" ]; then
+            echo "has_docker=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_docker=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Active feature work keeps its manifest at the root. Finalize moves
+          # it into a feature-specific archive before the PR opens, so resolve
+          # the one archive manifest added or modified by this PR. Historical
+          # archives already on the base branch are deliberately ignored.
+          # BEGIN IE MANIFEST RESOLUTION (exercised by quality-gates-manifest-resolution.test.ts)
+          ACTIVE_MANIFEST=".flowforge/manifest.yml"
+          MANIFEST=""
+          if [ -f "$ACTIVE_MANIFEST" ]; then
+            MANIFEST="$ACTIVE_MANIFEST"
+          else
+            ARCHIVE_CANDIDATES=$(git diff --name-only --diff-filter=AM "$PR_BASE_SHA...HEAD" -- '.flowforge/archive/FT-*/manifest.yml')
+            ARCHIVE_COUNT=0
+            ARCHIVE_MANIFEST=""
+            while IFS= read -r CANDIDATE; do
+              [ -z "$CANDIDATE" ] && continue
+              ARCHIVE_COUNT=$((ARCHIVE_COUNT + 1))
+              ARCHIVE_MANIFEST="$CANDIDATE"
+            done <<EOF
+          $ARCHIVE_CANDIDATES
+          EOF
+
+            if [ "$ARCHIVE_COUNT" -eq 1 ]; then
+              MANIFEST="$ARCHIVE_MANIFEST"
+            elif [ "$ARCHIVE_COUNT" -gt 1 ]; then
+              echo "::error::Ambiguous Flowforge PR: found $ARCHIVE_COUNT changed archive manifests. Expected exactly one finalized feature archive."
+              echo "$ARCHIVE_CANDIDATES"
+              exit 1
+            elif echo "$PR_HEAD_REF" | grep -Eq '^feature/FT-[0-9]+(-|$)'; then
+              echo "::error::Flowforge feature PR '$PR_HEAD_REF' has neither an active manifest nor a changed finalized archive manifest."
+              exit 1
+            fi
+          fi
+          echo "manifest_path=$MANIFEST" >> "$GITHUB_OUTPUT"
+          # END IE MANIFEST RESOLUTION
+
+          # Parse the resolved v2 manifest for feature id + the product-hub locator.
+          # hub_slug (owner/name) is derived from product_hub_remote so renamed
+          # and cross-org hubs resolve correctly (ADR-0054); it is shared with
+          # every job that needs the hub (spec-compliance checkout, standards
+          # checkout, ci-passed dispatch). Falls back to the PRODUCT_HUB_REPO
+          # convention var for legacy manifests with no remote.
+          HUB_SLUG=""
+          if [ -f "$MANIFEST" ]; then
+            FEATURE_ID=$(grep -A3 '^feature:' "$MANIFEST" | grep -E '^[[:space:]]+id:' | head -1 | sed -E 's/.*id:[[:space:]]*"?([^"]*)"?[[:space:]]*$/\1/')
+            REMOTE=$(grep -E '^product_hub_remote:' "$MANIFEST" | head -1 | sed -E 's/^product_hub_remote:[[:space:]]*"?([^"]*)"?[[:space:]]*$/\1/')
+            HUB_SLUG=$(echo "$REMOTE" | sed -E 's#^(git@[^:]+:|https?://[^/]+/|ssh://git@[^/]+/)##; s#\.git$##')
+            # Both values are parsed from PR-controlled manifest content. Constrain
+            # them to a safe charset at the source so no downstream consumer (run:
+            # via env:, checkout with:, gh api) ever sees shell metacharacters.
+            if [ -n "$FEATURE_ID" ] && ! echo "$FEATURE_ID" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+              echo "::warning::Manifest feature id has an unexpected format — using 'unknown'."
+              FEATURE_ID=""
+            fi
+            if [ -n "$HUB_SLUG" ] && ! echo "$HUB_SLUG" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
+              echo "::warning::Manifest product_hub_remote does not resolve to an owner/repo slug — falling back to PRODUCT_HUB_REPO."
+              HUB_SLUG=""
+            fi
+            echo "feature_id=${FEATURE_ID:-unknown}" >> $GITHUB_OUTPUT
+          else
+            echo "feature_id=unknown" >> $GITHUB_OUTPUT
+          fi
+          echo "hub_slug=${HUB_SLUG:-$PRODUCT_HUB_REPO}" >> $GITHUB_OUTPUT
+          # service_type — detected from repo markers (v2 manifests don't carry it;
+          # the old "unknown" fallback silently skipped frontend-only gates, ADR-0059).
+          if ls next.config.* >/dev/null 2>&1 || { [ -f "package.json" ] && grep -q '"next"' package.json; }; then
+            echo "service_type=frontend" >> $GITHUB_OUTPUT
+          elif [ -f "pom.xml" ] || [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+            echo "service_type=backend" >> $GITHUB_OUTPUT
+          else
+            echo "service_type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      # Detect outputs are derived from PR-controlled content (manifest, repo
+      # files). Every run:/github-script consumer below takes them through
+      # step-level env: — never raw ${{ }} interpolation into script text
+      # (GitHub Actions script-injection hardening). Enforced by
+      # workflow-script-injection.test.ts.
+      - name: Log detection results
+        env:
+          TECH_STACK: ${{ steps.detect.outputs.tech_stack }}
+          BUILD_TOOL: ${{ steps.detect.outputs.build_tool }}
+          HAS_E2E: ${{ steps.detect.outputs.has_e2e }}
+          SERVICE_TYPE: ${{ steps.detect.outputs.service_type }}
+          HAS_DOCKER: ${{ steps.detect.outputs.has_docker }}
+          FEATURE_ID: ${{ steps.detect.outputs.feature_id }}
+          MANIFEST_PATH: ${{ steps.detect.outputs.manifest_path }}
+        run: |
+          echo "Tech stack: $TECH_STACK ($BUILD_TOOL)"
+          echo "E2E suite: $HAS_E2E"
+          echo "Service type: $SERVICE_TYPE"
+          echo "Has Docker: $HAS_DOCKER"
+          echo "Feature ID: $FEATURE_ID"
+          echo "Manifest: ${MANIFEST_PATH:-none}"
+
+  # ===========================================================================
+  # Stage 1: Static Analysis (blocking)
+  # ===========================================================================
+  static-analysis:
+    runs-on: ubuntu-latest
+    needs: detect
+    outputs:
+      result: ${{ steps.result.outputs.status }}
+      duration: ${{ steps.result.outputs.duration }}
+      notes: ${{ steps.result.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # --- Java/Maven ---
+      - name: Set up Java
+        if: needs.detect.outputs.tech_stack == 'java'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: ${{ needs.detect.outputs.build_tool }}
+
+      - name: Java — Lint (Checkstyle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: |
+          if grep -q 'maven-checkstyle-plugin\|checkstyle' pom.xml 2>/dev/null; then
+            mvn checkstyle:check -q
+          else
+            echo "Checkstyle not configured in pom.xml — skipping"
+          fi
+
+      - name: Java — Compile check
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: mvn compile -q
+
+      - name: Java — Dependency audit
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: |
+          # Check for known vulnerable dependencies via OWASP dependency-check
+          if grep -q 'dependency-check-maven' pom.xml 2>/dev/null; then
+            mvn org.owasp:dependency-check-maven:check -q
+          else
+            echo "OWASP dependency-check not configured in pom.xml — skipping"
+          fi
+
+      - name: Java — License compliance
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: |
+          if grep -q 'license-maven-plugin' pom.xml 2>/dev/null; then
+            mvn license:add-third-party -q
+            # Check output for GPL/AGPL licenses
+            if [ -f "target/generated-sources/license/THIRD-PARTY.txt" ]; then
+              if grep -iE 'GPL-3|AGPL' "target/generated-sources/license/THIRD-PARTY.txt"; then
+                echo "::error::Found GPL/AGPL licensed dependencies"
+                exit 1
+              fi
+            fi
+          else
+            echo "License-maven-plugin not configured in pom.xml — skipping"
+          fi
+
+      # --- Java/Gradle ---
+      # Unlike Maven (which resolves plugins on demand), a Gradle task only
+      # exists when its plugin is applied — probe the task registry, not the
+      # build file text (convention plugins would evade a text grep). Optional
+      # analyzers skip when absent; compile and tests always run (the whole
+      # point of this branch).
+      - name: Java — Lint (Checkstyle, Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: |
+          if ./gradlew tasks --all -q 2>/dev/null | grep -q '^checkstyleMain'; then
+            ./gradlew checkstyleMain checkstyleTest --console=plain
+          else
+            echo "Checkstyle not configured in the Gradle build — skipping"
+          fi
+
+      - name: Java — Compile check (Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: ./gradlew classes testClasses --console=plain
+
+      - name: Java — Dependency audit (Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: |
+          if ./gradlew tasks --all -q 2>/dev/null | grep -q '^dependencyCheckAnalyze'; then
+            ./gradlew dependencyCheckAnalyze --console=plain
+          else
+            echo "OWASP dependency-check not configured in the Gradle build — skipping"
+          fi
+
+      - name: Java — License compliance (Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: |
+          if ./gradlew tasks --all -q 2>/dev/null | grep -q '^generateLicenseReport'; then
+            ./gradlew generateLicenseReport --console=plain
+            if grep -riE 'GPL-3|AGPL' build/reports/dependency-license/ 2>/dev/null; then
+              echo "::error::Found GPL/AGPL licensed dependencies"
+              exit 1
+            fi
+          elif ./gradlew tasks --all -q 2>/dev/null | grep -q '^checkLicense'; then
+            ./gradlew checkLicense --console=plain
+          else
+            echo "License plugin not configured in the Gradle build — skipping"
+          fi
+
+      # --- Node.js ---
+      - name: Set up Node.js
+        if: needs.detect.outputs.tech_stack == 'node'
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Node.js — Install dependencies
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm ci
+
+      - name: Node.js — Lint
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm run lint
+
+      - name: Node.js — Format check
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm run format:check --if-present
+
+      - name: Node.js — Dependency audit
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm audit --audit-level=high
+
+      - name: Node.js — License compliance
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npx license-checker --production --failOn 'GPL-3.0;AGPL-3.0' --summary
+
+      - name: Record result
+        id: result
+        if: always()
+        env:
+          TECH: ${{ needs.detect.outputs.tech_stack }}
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+          echo "duration=${{ job.status }}" >> $GITHUB_OUTPUT
+          echo "notes=Tech stack: $TECH" >> $GITHUB_OUTPUT
+
+  # ===========================================================================
+  # Stage 2: Test Execution (blocking)
+  # ===========================================================================
+  test-execution:
+    runs-on: ubuntu-latest
+    needs: [detect, static-analysis]
+    outputs:
+      result: ${{ steps.result.outputs.status }}
+      total: ${{ steps.result.outputs.total }}
+      passed: ${{ steps.result.outputs.passed }}
+      failed: ${{ steps.result.outputs.failed }}
+      skipped: ${{ steps.result.outputs.skipped }}
+      coverage: ${{ steps.result.outputs.coverage }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # --- Java/Maven ---
+      - name: Set up Java
+        if: needs.detect.outputs.tech_stack == 'java'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: ${{ needs.detect.outputs.build_tool }}
+
+      - name: Java — Unit tests (Surefire)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: mvn test -q
+
+      - name: Java — Integration tests (Failsafe)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: |
+          if grep -q 'maven-failsafe-plugin\|failsafe' pom.xml 2>/dev/null; then
+            mvn verify -q
+          else
+            echo "Failsafe not configured in pom.xml — skipping integration tests"
+          fi
+
+      - name: Java — Tests (Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: ./gradlew test --console=plain
+
+      - name: Java — Integration tests (Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: |
+          # Prefer a dedicated integrationTest task; otherwise fall back to the
+          # umbrella `check`, which runs the project's full verification suite
+          # (test results are up-to-date, so nothing reruns needlessly).
+          if ./gradlew tasks --all -q 2>/dev/null | grep -q '^integrationTest'; then
+            ./gradlew integrationTest --console=plain
+          else
+            ./gradlew check --console=plain
+          fi
+
+      - name: Java — Coverage report (Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: |
+          if ./gradlew tasks --all -q 2>/dev/null | grep -q '^jacocoTestReport'; then
+            ./gradlew jacocoTestReport --console=plain
+          else
+            echo "JaCoCo not configured in the Gradle build — skipping coverage report"
+          fi
+
+      - name: Java — Parse test results
+        if: needs.detect.outputs.tech_stack == 'java' && always()
+        id: java-tests
+        env:
+          BUILD_TOOL: ${{ needs.detect.outputs.build_tool }}
+        run: |
+          # Maven Surefire and the Gradle test task write the same JUnit XML
+          # shape to different roots; JaCoCo HTML likewise.
+          if [ "$BUILD_TOOL" = "gradle" ]; then
+            # All test tasks' XML (test + integrationTest source sets).
+            REPORTS_DIR="build/test-results"
+            JACOCO="build/reports/jacoco/test/html/index.html"
+          else
+            REPORTS_DIR="target/surefire-reports"
+            JACOCO="target/site/jacoco/index.html"
+          fi
+          if [ -d "$REPORTS_DIR" ]; then
+            TOTAL=$(find "$REPORTS_DIR" -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; | \
+              sed -n 's/.*tests="\([0-9]*\)".*/\1/p' | awk '{s+=$1} END {print s+0}')
+            FAILURES=$(find "$REPORTS_DIR" -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; | \
+              sed -n 's/.*failures="\([0-9]*\)".*/\1/p' | awk '{s+=$1} END {print s+0}')
+            ERRORS=$(find "$REPORTS_DIR" -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; | \
+              sed -n 's/.*errors="\([0-9]*\)".*/\1/p' | awk '{s+=$1} END {print s+0}')
+            SKIPPED=$(find "$REPORTS_DIR" -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; | \
+              sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' | awk '{s+=$1} END {print s+0}')
+            FAILED=$((FAILURES + ERRORS))
+            PASSED=$((TOTAL - FAILED - SKIPPED))
+          else
+            TOTAL=0; PASSED=0; FAILED=0; SKIPPED=0
+          fi
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+          # Parse JaCoCo coverage if available
+          if [ -f "$JACOCO" ]; then
+            COVERAGE=$(grep -o 'Total[^%]*%' "$JACOCO" | grep -o '[0-9]*%' | head -1 | tr -d '%')
+          else
+            COVERAGE="N/A"
+          fi
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      # --- Node.js ---
+      - name: Set up Node.js
+        if: needs.detect.outputs.tech_stack == 'node'
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Node.js — Install dependencies
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm ci
+
+      - name: Node.js — Unit tests
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm test -- --coverage --json --outputFile=test-results.json 2>/dev/null || npm test
+
+      - name: Node.js — Integration tests
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm run test:integration --if-present
+
+      - name: Node.js — Accessibility tests
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm run test:a11y --if-present
+
+      - name: Node.js — Parse test results
+        if: needs.detect.outputs.tech_stack == 'node' && always()
+        id: node-tests
+        run: |
+          # tonumber? forces numeric values — test-results.json is produced by the
+          # PR's own test run, so string fields must never propagate into outputs.
+          if [ -f "test-results.json" ]; then
+            TOTAL=$(jq '.numTotalTests // 0 | tonumber? // 0' test-results.json)
+            PASSED=$(jq '.numPassedTests // 0 | tonumber? // 0' test-results.json)
+            FAILED=$(jq '.numFailedTests // 0 | tonumber? // 0' test-results.json)
+            SKIPPED=$(jq '.numPendingTests // 0 | tonumber? // 0' test-results.json)
+          else
+            # Fallback: try to parse from npm test output
+            TOTAL=0; PASSED=0; FAILED=0; SKIPPED=0
+          fi
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+          # Parse coverage from coverage-summary.json
+          COV_FILE="coverage/coverage-summary.json"
+          if [ -f "$COV_FILE" ]; then
+            COVERAGE=$(jq '.total.lines.pct // 0 | tonumber? // 0' "$COV_FILE" | cut -d. -f1)
+          else
+            COVERAGE="N/A"
+          fi
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      # JUnit XML from unit/integration runs feeds the QA evidence document
+      # (ie scenarios evidence, STD-035) assembled in the reporting job.
+      - name: Upload test result XML (for QA evidence)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results-xml
+          path: |
+            target/surefire-reports/TEST-*.xml
+            target/failsafe-reports/TEST-*.xml
+            build/test-results/**/TEST-*.xml
+          if-no-files-found: ignore
+
+      - name: Record result
+        id: result
+        if: always()
+        # Test counts are parsed from PR-produced reports — env: only, never
+        # raw ${{ }} in the script (script-injection hardening).
+        env:
+          TECH: ${{ needs.detect.outputs.tech_stack }}
+          JAVA_TOTAL: ${{ steps.java-tests.outputs.total }}
+          JAVA_PASSED: ${{ steps.java-tests.outputs.passed }}
+          JAVA_FAILED: ${{ steps.java-tests.outputs.failed }}
+          JAVA_SKIPPED: ${{ steps.java-tests.outputs.skipped }}
+          JAVA_COVERAGE: ${{ steps.java-tests.outputs.coverage }}
+          NODE_TOTAL: ${{ steps.node-tests.outputs.total }}
+          NODE_PASSED: ${{ steps.node-tests.outputs.passed }}
+          NODE_FAILED: ${{ steps.node-tests.outputs.failed }}
+          NODE_SKIPPED: ${{ steps.node-tests.outputs.skipped }}
+          NODE_COVERAGE: ${{ steps.node-tests.outputs.coverage }}
+        run: |
+          if [ "$TECH" = "java" ]; then
+            echo "total=$JAVA_TOTAL" >> $GITHUB_OUTPUT
+            echo "passed=$JAVA_PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$JAVA_FAILED" >> $GITHUB_OUTPUT
+            echo "skipped=$JAVA_SKIPPED" >> $GITHUB_OUTPUT
+            echo "coverage=$JAVA_COVERAGE" >> $GITHUB_OUTPUT
+          else
+            echo "total=$NODE_TOTAL" >> $GITHUB_OUTPUT
+            echo "passed=$NODE_PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$NODE_FAILED" >> $GITHUB_OUTPUT
+            echo "skipped=$NODE_SKIPPED" >> $GITHUB_OUTPUT
+            echo "coverage=$NODE_COVERAGE" >> $GITHUB_OUTPUT
+          fi
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+  # ===========================================================================
+  # E2E Acceptance (advisory, ADR-0045) — project-owned co-located suite
+  # ===========================================================================
+  # Runs the repo's own `test:e2e` runner (STD-035 runner contract: exit code
+  # = verdict, JUnit XML under e2e-results/). Opt-in via repo/org variable
+  # E2E_IN_CI=true — most suites need a running stack CI does not provide.
+  # Never blocks the PR; results feed the QA evidence artifact.
+  e2e-acceptance:
+    runs-on: ubuntu-latest
+    needs: [detect, test-execution]
+    if: needs.detect.outputs.has_e2e == 'true' && vars.E2E_IN_CI == 'true'
+    continue-on-error: true
+    # Bound the run: the reporting job (and the ci-passed dispatch behind it)
+    # waits on this job — continue-on-error covers failure, not duration.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run project-owned E2E suite
+        run: npm run test:e2e
+
+      - name: Upload E2E result XML (for QA evidence)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-results
+          path: e2e-results/
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # Stage 3: Spec Compliance (blocking)
+  # ===========================================================================
+  spec-compliance:
+    runs-on: ubuntu-latest
+    needs: [detect, test-execution]
+    outputs:
+      result: ${{ steps.result.outputs.status }}
+      scenario_coverage: ${{ steps.gherkin.outputs.coverage }}
+      contract_valid: ${{ steps.contract.outputs.valid }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Hub repo resolved from the manifest's product_hub_remote (computed once
+      # in the detect job, ADR-0054) so renamed/cross-org hubs work without a
+      # per-repo PRODUCT_HUB_REPO variable.
+      - name: Checkout product-hub
+        id: checkout-hub
+        continue-on-error: true
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ needs.detect.outputs.hub_slug }}
+          token: ${{ secrets.PRODUCT_HUB_TOKEN || github.token }}
+          path: .product-hub
+          sparse-checkout: |
+            specs
+            standards
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@rp-flow'
+
+      # Install only for the spec-drift step below. continue-on-error so a
+      # missing package token (cross-org / GITHUB_TOKEN without package:read)
+      # degrades drift detection to a skip — it must never take down the
+      # pre-existing Gherkin/contract gates in this job. Set an org secret
+      # IE_CLI_PACKAGES_TOKEN (Packages: read) to enable drift detection.
+      - name: Install ie CLI (for spec-drift)
+        id: install_ie
+        continue-on-error: true
+        run: npm install -g @rp-flow/ie-cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.IE_CLI_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # Spec-drift detection (ADR-0054): recompute each manifest spec's hash
+      # from the product-hub checkout and compare to the pinned spec_hash.
+      # Warn-only by default (ADR-0045 "warnings, not blocks"); set repo/org
+      # variable SPEC_DRIFT_BLOCKING=true to fail the job on drift.
+      - name: Spec-drift detection
+        id: spec_drift
+        env:
+          HUB_SLUG: ${{ needs.detect.outputs.hub_slug }}
+          BLOCKING: ${{ vars.SPEC_DRIFT_BLOCKING }}
+          MANIFEST: ${{ needs.detect.outputs.manifest_path }}
+        run: |
+          if ! command -v ie >/dev/null 2>&1; then
+            echo "::warning::ie CLI unavailable (package token not configured?) — skipping spec-drift detection. Set IE_CLI_PACKAGES_TOKEN to enable."
+            exit 0
+          fi
+          if [ ! -f "$MANIFEST" ]; then
+            echo "No manifest — skipping spec-drift detection"
+            exit 0
+          fi
+          if [ ! -d ".product-hub" ]; then
+            echo "::warning::product-hub checkout failed for '$HUB_SLUG' (checkout outcome: ${{ steps.checkout-hub.outcome }}) — set PRODUCT_HUB_TOKEN or confirm it can read that repo. Skipping spec-drift detection."
+            exit 0
+          fi
+          set +e
+          ie manifest verify --manifest "$MANIFEST" --hub .product-hub --json > drift.json 2> drift.err
+          CODE=$?
+          set -e
+          cat drift.json
+          # Classify the result in node so a verify *error/crash* is never
+          # misreported as spec *drift*. Exit code drives the gate: only real
+          # drift under SPEC_DRIFT_BLOCKING=true fails the job.
+          VERIFY_CODE="$CODE" node -e '
+            const fs = require("fs");
+            let r = null;
+            try { r = JSON.parse(fs.readFileSync("drift.json", "utf8")); } catch (e) {}
+            if (!r || typeof r !== "object") {
+              const err = fs.existsSync("drift.err") ? fs.readFileSync("drift.err", "utf8").trim() : "";
+              console.log(`::warning::spec-drift verify produced no result (exit ${process.env.VERIFY_CODE}); skipping. ${err}`.trim());
+              process.exit(0);
+            }
+            const specs = (r.data && Array.isArray(r.data.specs)) ? r.data.specs : [];
+            const bad = specs.filter(s => s.status !== "ok");
+            if (r.success) { console.log("No spec drift."); process.exit(0); }
+            if (bad.length === 0) {
+              console.log(`::warning::spec-drift verify could not run: ${r.error || "unknown error"} (not treated as drift)`);
+              process.exit(0);
+            }
+            for (const s of bad) {
+              console.log(`::warning file=${s.path}::${s.id} ${s.status} — remedy: ${s.remedy || "ie feature handover --refresh"}`);
+            }
+            if (process.env.BLOCKING === "true") {
+              console.log("::error::Spec drift detected and SPEC_DRIFT_BLOCKING=true — failing the job.");
+              process.exit(1);
+            }
+            console.log("::warning::Spec drift detected (non-blocking). Set repository/org variable SPEC_DRIFT_BLOCKING=true to enforce.");
+            process.exit(0);
+          '
+
+      - name: Gherkin scenario coverage
+        id: gherkin
+        env:
+          HUB_SLUG: ${{ needs.detect.outputs.hub_slug }}
+          TECH: ${{ needs.detect.outputs.tech_stack }}
+          MANIFEST: ${{ needs.detect.outputs.manifest_path }}
+        run: |
+          if [ ! -f "$MANIFEST" ]; then
+            echo "No manifest found — skipping Gherkin coverage check"
+            echo "coverage=N/A" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ ! -d ".product-hub" ]; then
+            echo "::warning::product-hub checkout failed for '$HUB_SLUG' (checkout outcome: ${{ steps.checkout-hub.outcome }}) — set PRODUCT_HUB_TOKEN or confirm it can read that repo. Skipping Gherkin coverage."
+            echo "coverage=N/A" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Extract scenario file paths from manifest
+          SCENARIO_FILES=$(grep 'scenarios:' "$MANIFEST" | sed 's/.*scenarios: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/' | tr -d ' ')
+
+          TOTAL_SCENARIOS=0
+          COVERED_SCENARIOS=0
+          UNCOVERED=""
+
+          for SPEC_FILE in $SCENARIO_FILES; do
+            FEATURE_FILE=".product-hub/$SPEC_FILE"
+            if [ ! -f "$FEATURE_FILE" ]; then
+              echo "Warning: Scenario file not found: $SPEC_FILE"
+              continue
+            fi
+
+            # Extract scenario names from .feature files
+            SCENARIOS=$(grep -E '^\s*(Scenario|Scenario Outline):' "$FEATURE_FILE" | sed 's/.*: *//')
+
+            while IFS= read -r SCENARIO; do
+              [ -z "$SCENARIO" ] && continue
+              TOTAL_SCENARIOS=$((TOTAL_SCENARIOS + 1))
+
+              # Create search keywords from scenario name (split on spaces, take key words)
+              KEYWORDS=$(echo "$SCENARIO" | tr '[:upper:]' '[:lower:]' | tr ' ' '\n' | grep -v -E '^(a|an|the|is|are|when|then|given|and|with|for|to|of|in|on|at|by)$' | head -5)
+
+              FOUND=false
+              if [ "$TECH" = "java" ] || [ "$TECH" = "gradle" ]; then
+                SEARCH_DIR="src/test"
+              else
+                SEARCH_DIR="src"
+              fi
+
+              if [ -d "$SEARCH_DIR" ]; then
+                # Check if any keyword from the scenario appears in test files
+                for KW in $KEYWORDS; do
+                  if grep -r -i -l "$KW" "$SEARCH_DIR" --include="*.java" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --include="*.spec.*" --include="*Test*" --include="*test*" > /dev/null 2>&1; then
+                    FOUND=true
+                    break
+                  fi
+                done
+              fi
+
+              if [ "$FOUND" = true ]; then
+                COVERED_SCENARIOS=$((COVERED_SCENARIOS + 1))
+              else
+                UNCOVERED="$UNCOVERED\n  - $SCENARIO"
+              fi
+            done <<< "$SCENARIOS"
+          done
+
+          if [ "$TOTAL_SCENARIOS" -gt 0 ]; then
+            COVERAGE=$((COVERED_SCENARIOS * 100 / TOTAL_SCENARIOS))
+          else
+            COVERAGE=100
+          fi
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+          echo "Gherkin Scenario Coverage: $COVERED_SCENARIOS / $TOTAL_SCENARIOS ($COVERAGE%)"
+          if [ -n "$UNCOVERED" ]; then
+            echo -e "Uncovered scenarios:$UNCOVERED"
+          fi
+
+          # Fail if coverage below threshold (default 70%)
+          THRESHOLD=${GHERKIN_COVERAGE_THRESHOLD:-70}
+          if [ "$COVERAGE" -lt "$THRESHOLD" ]; then
+            echo "::error::Gherkin scenario coverage ($COVERAGE%) is below threshold ($THRESHOLD%)"
+            exit 1
+          fi
+
+      - name: Contract validation
+        id: contract
+        env:
+          MANIFEST: ${{ needs.detect.outputs.manifest_path }}
+        run: |
+          if [ ! -f "$MANIFEST" ] || [ ! -d ".product-hub" ]; then
+            echo "No manifest or product-hub not available — skipping contract validation"
+            echo "valid=N/A" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Extract contract file paths from the manifest files map. v2 manifests
+          # list contracts as `contract.openapi.yml: "<path>"` and (ADR-0051)
+          # `contract.asyncapi.yml: "<path>"`. Legacy `contract: "<path>"` is also
+          # accepted and treated as OpenAPI.
+          OPENAPI_FILES=$(grep -E 'contract(\.openapi\.yml)?:' "$MANIFEST" | sed -E 's/.*contract(\.openapi\.yml)?: *"?([^"]*)"?/\2/' | tr -d ' ' | sort -u)
+          ASYNCAPI_FILES=$(grep -E 'contract\.asyncapi\.yml:' "$MANIFEST" | sed -E 's/.*contract\.asyncapi\.yml: *"?([^"]*)"?/\1/' | tr -d ' ' | sort -u)
+
+          ALL_VALID=true
+
+          # --- Sync contracts (OpenAPI) ---
+          for CONTRACT_FILE in $OPENAPI_FILES; do
+            FULL_PATH=".product-hub/$CONTRACT_FILE"
+            if [ ! -f "$FULL_PATH" ]; then
+              echo "Warning: OpenAPI contract not found: $CONTRACT_FILE"
+              continue
+            fi
+            echo "Validating (OpenAPI): $CONTRACT_FILE"
+            if npx --yes @redocly/cli lint "$FULL_PATH" --skip-rule no-unused-components 2>&1; then
+              echo "  Valid"
+            else
+              echo "::error::OpenAPI contract validation failed: $CONTRACT_FILE"
+              ALL_VALID=false
+            fi
+          done
+
+          # --- Async contracts (AsyncAPI 3.0, ADR-0051) ---
+          for CONTRACT_FILE in $ASYNCAPI_FILES; do
+            FULL_PATH=".product-hub/$CONTRACT_FILE"
+            if [ ! -f "$FULL_PATH" ]; then
+              echo "Warning: AsyncAPI contract not found: $CONTRACT_FILE"
+              continue
+            fi
+            echo "Validating (AsyncAPI): $CONTRACT_FILE"
+            if npx --yes @asyncapi/cli validate "$FULL_PATH" 2>&1; then
+              echo "  Valid"
+            else
+              echo "::error::AsyncAPI contract validation failed: $CONTRACT_FILE"
+              ALL_VALID=false
+            fi
+          done
+
+          echo "valid=$ALL_VALID" >> $GITHUB_OUTPUT
+          if [ "$ALL_VALID" = "false" ]; then
+            exit 1
+          fi
+
+      - name: Contract operation coverage (STD-024)
+        id: contract_coverage
+        env:
+          BLOCKING: ${{ vars.CONTRACT_COVERAGE_BLOCKING }}
+        run: |
+          if ! command -v ie >/dev/null 2>&1; then
+            echo "::warning::ie CLI unavailable — skipping contract operation coverage. Set IE_CLI_PACKAGES_TOKEN to enable."
+            exit 0
+          fi
+          set +e
+          ie contracts coverage --json > coverage.json 2> coverage.err
+          set -e
+          cat coverage.json 2>/dev/null || true
+          # Classify in node: coverage gaps warn by default (ADR-0045 "warnings,
+          # not blocks"), or fail when CONTRACT_COVERAGE_BLOCKING=true. A run error
+          # (no result) is a skip, never a false gap. /ie/generate already hard-gates
+          # this at generation time (STD-024); this is the CI backstop.
+          node -e '
+            const fs = require("fs");
+            let r = null;
+            try { r = JSON.parse(fs.readFileSync("coverage.json", "utf8")); } catch (e) {}
+            if (!r || typeof r !== "object") {
+              const err = fs.existsSync("coverage.err") ? fs.readFileSync("coverage.err", "utf8").trim() : "";
+              console.log(`::warning::contract coverage produced no result; skipping. ${err}`.trim());
+              process.exit(0);
+            }
+            if (r.success) { console.log("All owned contract operations have a passing conformance test."); process.exit(0); }
+            const unc = (r.data && Array.isArray(r.data.uncovered)) ? r.data.uncovered : [];
+            for (const u of unc) {
+              console.log(`::warning::contract operation lacks a passing conformance test: ${u.operation} (${u.uc}) — ${u.status === null ? "absent from the coverage table" : "status: " + u.status}`);
+            }
+            if (process.env.BLOCKING === "true") {
+              console.log("::error::Contract operations lack passing conformance tests and CONTRACT_COVERAGE_BLOCKING=true — failing the job.");
+              process.exit(1);
+            }
+            console.log("::warning::Contract operation coverage gaps (non-blocking). Set repository/org variable CONTRACT_COVERAGE_BLOCKING=true to enforce.");
+            process.exit(0);
+          '
+
+      - name: Design Token usage (frontend only)
+        if: needs.detect.outputs.service_type == 'frontend'
+        run: npm run test:design-tokens --if-present
+
+      - name: Record result
+        id: result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+  # ===========================================================================
+  # Stage 4: Security Gates (blocking)
+  # ===========================================================================
+  security-gates:
+    runs-on: ubuntu-latest
+    needs: [detect, test-execution]
+    outputs:
+      result: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # --- Java/Maven ---
+      - name: Set up Java
+        if: needs.detect.outputs.tech_stack == 'java'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: ${{ needs.detect.outputs.build_tool }}
+
+      - name: Java — SAST (SpotBugs)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'maven'
+        run: |
+          # Run SpotBugs only if configured in pom.xml
+          if grep -q 'spotbugs-maven-plugin' pom.xml 2>/dev/null; then
+            mvn spotbugs:check -q
+          else
+            echo "SpotBugs not configured — running basic compilation analysis"
+            mvn compile -q
+          fi
+
+      - name: Java — SAST (SpotBugs, Gradle)
+        if: needs.detect.outputs.tech_stack == 'java' && needs.detect.outputs.build_tool == 'gradle'
+        run: |
+          # SpotBugs task exists only when its plugin is applied; fall back to a
+          # compile so the SAST gate still exercises the code (parallels Maven).
+          if ./gradlew tasks --all -q 2>/dev/null | grep -q '^spotbugsMain'; then
+            ./gradlew spotbugsMain --console=plain
+          else
+            echo "SpotBugs not configured — running basic compilation analysis"
+            ./gradlew classes --console=plain
+          fi
+
+      # --- Node.js ---
+      - name: Set up Node.js
+        if: needs.detect.outputs.tech_stack == 'node'
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Node.js — Install dependencies
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm ci
+
+      - name: Node.js — SAST
+        if: needs.detect.outputs.tech_stack == 'node'
+        run: npm run lint:security --if-present
+
+      - name: Secret detection
+        run: |
+          # Scan for accidentally committed secrets
+          npx --yes secretlint "**/*" 2>/dev/null || {
+            EXIT_CODE=$?
+            if [ "$EXIT_CODE" -eq 1 ]; then
+              echo "::error::Secrets detected in source code"
+              exit 1
+            else
+              echo "secretlint completed (no secrets found or tool not fully configured)"
+            fi
+          }
+
+      - name: Container scanning
+        if: needs.detect.outputs.has_docker == 'true'
+        run: |
+          # Build and scan the container image with Trivy
+          IMAGE_TAG="quality-gates-scan:$GITHUB_SHA"
+          docker build -t "$IMAGE_TAG" . 2>/dev/null || {
+            echo "Docker build failed — skipping container scan"
+            exit 0
+          }
+          npx --yes trivy image --severity HIGH,CRITICAL --exit-code 1 "$IMAGE_TAG" 2>/dev/null || {
+            echo "Trivy not available via npx — trying direct install"
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+            trivy image --severity HIGH,CRITICAL --exit-code 1 "$IMAGE_TAG"
+          }
+
+      - name: Record result
+        id: result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+  # ===========================================================================
+  # Stage 5: Standards Compliance (non-blocking per ADR-0013)
+  # ===========================================================================
+  standards-compliance:
+    runs-on: ubuntu-latest
+    needs: [detect, test-execution]
+    continue-on-error: true
+    outputs:
+      result: ${{ steps.result.outputs.status }}
+      alerts: ${{ steps.scan.outputs.alerts }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Checkout product-hub standards
+        id: checkout-hub-standards
+        continue-on-error: true
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ needs.detect.outputs.hub_slug }}
+          token: ${{ secrets.PRODUCT_HUB_TOKEN || github.token }}
+          path: .product-hub
+          sparse-checkout: |
+            standards
+          sparse-checkout-cone-mode: false
+
+      - name: Scan for unindexed patterns
+        id: scan
+        env:
+          TECH: ${{ needs.detect.outputs.tech_stack }}
+          HUB_SLUG: ${{ needs.detect.outputs.hub_slug }}
+        run: |
+          INDEX=".product-hub/standards/index.yml"
+
+          if [ ! -d ".product-hub" ]; then
+            echo "::warning::product-hub checkout failed for '$HUB_SLUG' (checkout outcome: ${{ steps.checkout-hub-standards.outcome }}) — set PRODUCT_HUB_TOKEN or confirm it can read that repo. Skipping pattern scan."
+            echo "alerts=none" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ ! -f "$INDEX" ]; then
+            echo "::warning::product-hub checked out, but standards/index.yml is absent — no standards index to scan against. Skipping pattern scan."
+            echo "alerts=none" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get changed files in this PR
+          CHANGED_FILES=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD" -- 'src/' 2>/dev/null || echo "")
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No source files changed — skipping standards scan"
+            echo "alerts=none" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Scanning $(echo "$CHANGED_FILES" | wc -l | tr -d ' ') changed files for patterns..."
+
+          ALERTS=""
+          MATCHED=0
+          UNMATCHED=0
+
+          # --- Java pattern detection (Maven + Gradle; both are JVM/src) ---
+          if [ "$TECH" = "java" ] || [ "$TECH" = "gradle" ]; then
+            for FILE in $CHANGED_FILES; do
+              [ ! -f "$FILE" ] && continue
+
+              # Detect controller pattern
+              if grep -q '@RestController\|@Controller' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-007' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Controller pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect service pattern
+              if grep -q '@Service' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-006' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Service pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect entity/repository pattern
+              if grep -q '@Entity\|@Repository' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-008' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Entity/Repository pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect error handling pattern
+              if grep -q 'DomainException\|@ExceptionHandler\|ErrorCategory' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-002' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Error handling pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect API envelope pattern
+              if grep -q 'ApiEnvelope' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-001' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- API envelope pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect event consumer pattern (ADR-0051)
+              if grep -q '@KafkaListener\|@RabbitListener\|@EventListener' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-022' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Event consumer pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect event publisher pattern (ADR-0051)
+              if grep -q 'KafkaTemplate\|StreamBridge\|EventPublisher' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-021' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Event publisher pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect test patterns
+              if echo "$FILE" | grep -qE 'Test\.java$|IT\.java$'; then
+                if grep -q 'STD-009' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Test pattern in $FILE (no matching standard)"
+                fi
+              fi
+            done
+          fi
+
+          # --- Node.js pattern detection ---
+          if [ "$TECH" = "node" ]; then
+            for FILE in $CHANGED_FILES; do
+              [ ! -f "$FILE" ] && continue
+
+              # Detect React component pattern
+              if grep -qE 'export (default )?(function|const) \w+.*React\.|forwardRef|React\.FC' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-004\|STD-012' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- React component pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect API client / React Query hook pattern
+              if grep -qE 'useQuery|useMutation|useInfiniteQuery|apiClient' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-010' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- API client/hook pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect form pattern
+              if grep -qE 'useForm|FormField|handleSubmit|fieldErrors' "$FILE" 2>/dev/null; then
+                if grep -q 'STD-011' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Form pattern in $FILE (no matching standard)"
+                fi
+              fi
+
+              # Detect page/routing pattern
+              if echo "$FILE" | grep -qE 'app/.*/page\.(tsx|ts|jsx|js)$'; then
+                if grep -q 'STD-013' "$INDEX" 2>/dev/null; then
+                  MATCHED=$((MATCHED + 1))
+                else
+                  UNMATCHED=$((UNMATCHED + 1))
+                  ALERTS="$ALERTS\n- Page/routing pattern in $FILE (no matching standard)"
+                fi
+              fi
+            done
+          fi
+
+          echo ""
+          echo "Standards compliance scan complete:"
+          echo "  Matched patterns: $MATCHED"
+          echo "  Unmatched patterns: $UNMATCHED"
+
+          if [ -n "$ALERTS" ]; then
+            echo -e "\nUnindexed Pattern Alerts (ADR-0013):$ALERTS"
+            # Escape newlines for output
+            ESCAPED_ALERTS=$(echo -e "$ALERTS" | jq -Rs .)
+            echo "alerts=$ESCAPED_ALERTS" >> $GITHUB_OUTPUT
+          else
+            echo "alerts=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Record result
+        id: result
+        if: always()
+        run: |
+          echo "status=completed" >> $GITHUB_OUTPUT
+
+  # ===========================================================================
+  # Stage 6: Compliance Report (always runs)
+  # ===========================================================================
+  compliance-report:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [detect, static-analysis, test-execution, spec-compliance, security-gates, standards-compliance, e2e-acceptance]
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # --- QA evidence (advisory, qa-evidence.schema.json / STD-035) ---
+      # Assembled here because this is the one job downstream of both result
+      # streams (unit/integration + e2e). Every step degrades to a skip
+      # (ADR-0045): a missing artifact, hub access, or package token must
+      # never take down the report. CI writes nothing back to the repo —
+      # evidence lands as the qa-evidence artifact + a PR-comment summary.
+      # Evidence must come from THIS run's artifacts — a committed
+      # qa-evidence.json or qa-results/ dir would otherwise survive the skip
+      # paths and pass off stale or fabricated inputs as CI-produced.
+      - name: Clear stale QA inputs
+        run: rm -rf qa-results qa-evidence.json
+
+      - name: Download test result XML
+        continue-on-error: true
+        uses: actions/download-artifact@v6
+        with:
+          name: test-results-xml
+          path: qa-results/test-results-xml
+
+      - name: Download E2E result XML
+        continue-on-error: true
+        uses: actions/download-artifact@v6
+        with:
+          name: e2e-results
+          path: qa-results/e2e-results
+
+      - name: Checkout product-hub (for scenario keys)
+        if: needs.detect.outputs.manifest_path != ''
+        continue-on-error: true
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ needs.detect.outputs.hub_slug }}
+          token: ${{ secrets.PRODUCT_HUB_TOKEN || github.token }}
+          path: .product-hub
+          sparse-checkout: |
+            specs
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v5
+        if: needs.detect.outputs.manifest_path != ''
+        continue-on-error: true
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@rp-flow'
+
+      - name: Install ie CLI (for QA evidence)
+        if: needs.detect.outputs.manifest_path != ''
+        continue-on-error: true
+        run: npm install -g @rp-flow/ie-cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.IE_CLI_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Assemble QA evidence
+        if: needs.detect.outputs.manifest_path != ''
+        env:
+          MANIFEST: ${{ needs.detect.outputs.manifest_path }}
+        run: |
+          if ! command -v ie >/dev/null 2>&1; then
+            echo "ie CLI unavailable — skipping QA evidence"
+            exit 0
+          fi
+          if [ ! -d ".product-hub" ]; then
+            echo "product-hub checkout unavailable — skipping QA evidence"
+            exit 0
+          fi
+          RESULT_DIRS=""
+          for dir in qa-results/test-results-xml qa-results/e2e-results; do
+            [ -d "$dir" ] && RESULT_DIRS="$RESULT_DIRS $dir"
+          done
+          if [ -z "$RESULT_DIRS" ]; then
+            echo "No result XML artifacts — skipping QA evidence (absence of evidence is recorded as absence, never as green)"
+            exit 0
+          fi
+          ie scenarios evidence --manifest "$MANIFEST" --hub .product-hub --results $RESULT_DIRS --out qa-evidence.json || {
+            echo "::warning::QA evidence assembly failed (advisory) — see the step log"
+            exit 0
+          }
+
+      - name: Upload QA evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: qa-evidence
+          path: qa-evidence.json
+          if-no-files-found: ignore
+
+      - name: Determine overall result
+        id: overall
+        run: |
+          SA="${{ needs.static-analysis.result }}"
+          TE="${{ needs.test-execution.result }}"
+          SC="${{ needs.spec-compliance.result }}"
+          SG="${{ needs.security-gates.result }}"
+
+          if [ "$SA" = "success" ] && [ "$TE" = "success" ] && [ "$SC" = "success" ] && [ "$SG" = "success" ]; then
+            echo "status=PASSED" >> $GITHUB_OUTPUT
+            echo "icon=✅" >> $GITHUB_OUTPUT
+          else
+            echo "status=FAILED" >> $GITHUB_OUTPUT
+            echo "icon=🛑" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate build report
+        id: report
+        # feature_id, branch name, and test counts are PR-influenceable — env:
+        # only (script-injection hardening). Sed replacement of env-var values
+        # cannot execute code; worst case a hostile value breaks the sed
+        # expression and fails this reporting step.
+        env:
+          FEATURE_ID: ${{ needs.detect.outputs.feature_id }}
+          BRANCH: ${{ github.head_ref }}
+          RESULT: ${{ steps.overall.outputs.status }}
+          TESTS_TOTAL: ${{ needs.test-execution.outputs.total }}
+          TESTS_PASSED: ${{ needs.test-execution.outputs.passed }}
+          TESTS_FAILED: ${{ needs.test-execution.outputs.failed }}
+          TESTS_SKIPPED: ${{ needs.test-execution.outputs.skipped }}
+          COVERAGE: ${{ needs.test-execution.outputs.coverage }}
+        run: |
+          REPORT_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # Map job results to passed/failed
+          status_label() {
+            case "$1" in
+              success) echo "passed" ;;
+              failure) echo "failed" ;;
+              cancelled) echo "cancelled" ;;
+              skipped) echo "skipped" ;;
+              *) echo "$1" ;;
+            esac
+          }
+
+          SA_STATUS=$(status_label "${{ needs.static-analysis.result }}")
+          TE_STATUS=$(status_label "${{ needs.test-execution.result }}")
+          SC_STATUS=$(status_label "${{ needs.spec-compliance.result }}")
+          SG_STATUS=$(status_label "${{ needs.security-gates.result }}")
+          ST_STATUS="completed (non-blocking)"
+
+          cat > build-report.md << 'REPORT_EOF'
+          # CI/CD Build Report — FEATURE_ID_PLACEHOLDER
+
+          ## Pipeline Summary
+
+          | Field | Value |
+          |-------|-------|
+          | Pipeline ID | RUN_ID_PLACEHOLDER |
+          | Branch | BRANCH_PLACEHOLDER |
+          | Commit | COMMIT_PLACEHOLDER |
+          | Run date | DATE_PLACEHOLDER |
+          | Duration | (see individual stages) |
+          | Result | RESULT_PLACEHOLDER |
+
+          ## Stage Results
+
+          | Stage | Status | Notes |
+          |-------|--------|-------|
+          | Static Analysis | SA_PLACEHOLDER | Blocking |
+          | Test Execution | TE_PLACEHOLDER | Blocking |
+          | Spec Compliance | SC_PLACEHOLDER | Blocking |
+          | Security Gates | SG_PLACEHOLDER | Blocking |
+          | Standards Compliance | ST_PLACEHOLDER | Non-blocking (ADR-0013) |
+
+          ## Test Summary
+
+          | Metric | Value |
+          |--------|-------|
+          | Total tests | TOTAL_PLACEHOLDER |
+          | Passed | PASSED_PLACEHOLDER |
+          | Failed | FAILED_PLACEHOLDER |
+          | Skipped | SKIPPED_PLACEHOLDER |
+          | Coverage % | COVERAGE_PLACEHOLDER |
+
+          ## Failures
+
+          FAILURES_PLACEHOLDER
+
+          ## Sign-Off
+
+          - **Pipeline result:** RESULT_PLACEHOLDER
+          - **Reviewed by:** automated
+          - **Date:** DATE_PLACEHOLDER
+          REPORT_EOF
+
+          # Replace placeholders
+          sed -i "s|FEATURE_ID_PLACEHOLDER|${FEATURE_ID}|g" build-report.md
+          sed -i "s|RUN_ID_PLACEHOLDER|#${GITHUB_RUN_ID}|g" build-report.md
+          sed -i "s|BRANCH_PLACEHOLDER|${BRANCH}|g" build-report.md
+          sed -i "s|COMMIT_PLACEHOLDER|${GITHUB_SHA}|g" build-report.md
+          sed -i "s|DATE_PLACEHOLDER|${REPORT_DATE}|g" build-report.md
+          sed -i "s|RESULT_PLACEHOLDER|${RESULT}|g" build-report.md
+          sed -i "s|SA_PLACEHOLDER|${SA_STATUS}|g" build-report.md
+          sed -i "s|TE_PLACEHOLDER|${TE_STATUS}|g" build-report.md
+          sed -i "s|SC_PLACEHOLDER|${SC_STATUS}|g" build-report.md
+          sed -i "s|SG_PLACEHOLDER|${SG_STATUS}|g" build-report.md
+          sed -i "s|ST_PLACEHOLDER|${ST_STATUS}|g" build-report.md
+          sed -i "s|TOTAL_PLACEHOLDER|${TESTS_TOTAL}|g" build-report.md
+          sed -i "s|PASSED_PLACEHOLDER|${TESTS_PASSED}|g" build-report.md
+          sed -i "s|FAILED_PLACEHOLDER|${TESTS_FAILED}|g" build-report.md
+          sed -i "s|SKIPPED_PLACEHOLDER|${TESTS_SKIPPED}|g" build-report.md
+          sed -i "s|COVERAGE_PLACEHOLDER|${COVERAGE}%|g" build-report.md
+
+          # Failures section
+          if [ "$RESULT" = "PASSED" ]; then
+            sed -i "s|FAILURES_PLACEHOLDER|No failures.|g" build-report.md
+          else
+            FAILURES="Pipeline failed. Check individual stage logs for details."
+            [ "$SA_STATUS" = "failed" ] && FAILURES="$FAILURES\n- **Static Analysis** failed"
+            [ "$TE_STATUS" = "failed" ] && FAILURES="$FAILURES\n- **Test Execution** failed"
+            [ "$SC_STATUS" = "failed" ] && FAILURES="$FAILURES\n- **Spec Compliance** failed"
+            [ "$SG_STATUS" = "failed" ] && FAILURES="$FAILURES\n- **Security Gates** failed"
+            sed -i "s|FAILURES_PLACEHOLDER|${FAILURES}|g" build-report.md
+          fi
+
+          # Clean up leading whitespace from heredoc
+          sed -i 's/^          //' build-report.md
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-report
+          path: build-report.md
+
+      - name: Post PR comment
+        uses: actions/github-script@v8
+        # Step outputs and event data reach the script as env vars, never via
+        # ${{ }} inside the JS source — a hostile feature id or branch name
+        # could otherwise break out of the string literal and run JS with this
+        # job's token (script-injection hardening). needs.*.result values are
+        # GitHub-set enums and stay inline.
+        env:
+          OVERALL: ${{ steps.overall.outputs.status }}
+          ICON: ${{ steps.overall.outputs.icon }}
+          FEATURE_ID: ${{ needs.detect.outputs.feature_id }}
+          TESTS_TOTAL: ${{ needs.test-execution.outputs.total }}
+          TESTS_PASSED: ${{ needs.test-execution.outputs.passed }}
+          TESTS_FAILED: ${{ needs.test-execution.outputs.failed }}
+          COVERAGE: ${{ needs.test-execution.outputs.coverage }}
+        with:
+          script: |
+            const fs = require('fs');
+            const overall = process.env.OVERALL;
+            const icon = process.env.ICON;
+            const featureId = process.env.FEATURE_ID;
+            const branch = process.env.GITHUB_HEAD_REF;
+
+            const sa = '${{ needs.static-analysis.result }}' === 'success' ? '✅' : '🛑';
+            const te = '${{ needs.test-execution.result }}' === 'success' ? '✅' : '🛑';
+            const sc = '${{ needs.spec-compliance.result }}' === 'success' ? '✅' : '🛑';
+            const sg = '${{ needs.security-gates.result }}' === 'success' ? '✅' : '🛑';
+            const st = '⚠️'; // Always non-blocking
+
+            const total = process.env.TESTS_TOTAL || 'N/A';
+            const passed = process.env.TESTS_PASSED || 'N/A';
+            const failed = process.env.TESTS_FAILED || 'N/A';
+            const coverage = process.env.COVERAGE || 'N/A';
+
+            // QA evidence summary (advisory) — present only when the evidence
+            // step assembled a document this run (see the qa-evidence artifact).
+            let qa = '';
+            try {
+              const doc = JSON.parse(fs.readFileSync('qa-evidence.json', 'utf8'));
+              const t = doc.coverage.totals;
+              const offUniverse = doc.coverage.unknown_keys.length;
+              qa = `\n**Scenario evidence (advisory):** ${t.covered_pass}/${t.scenarios} covered-pass (${t.coverage_pct}%), ` +
+                `${t.covered_fail} failing, ${t.uncovered} uncovered` +
+                (offUniverse ? `, ${offUniverse} off-universe key${offUniverse === 1 ? '' : 's'}` : '') +
+                ` | results digest \`${doc.results.digest.substring(0, 12)}\` | artifact: qa-evidence\n`;
+            } catch { /* no evidence assembled this run */ }
+
+            const body = `## ${icon} Quality Gates — ${overall}
+
+            **Feature:** ${featureId} | **Branch:** ${branch} | **Commit:** \`${context.sha.substring(0, 7)}\`
+
+            | Stage | Result | Blocking |
+            |-------|--------|----------|
+            | Static Analysis | ${sa} | Yes |
+            | Test Execution | ${te} | Yes |
+            | Spec Compliance | ${sc} | Yes |
+            | Security Gates | ${sg} | Yes |
+            | Standards Compliance | ${st} | No |
+
+            **Tests:** ${total} total, ${passed} passed, ${failed} failed | **Coverage:** ${coverage}%
+            ${qa}
+            <details><summary>Full build report</summary>
+
+            \`\`\`
+            ${fs.readFileSync('build-report.md', 'utf8')}
+            \`\`\`
+
+            </details>
+
+            ---
+            *Generated by Quality Gates (Phase 7) — [View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`;
+
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.body.includes('Quality Gates') && c.user.type === 'Bot'
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Dispatch ci-passed to product-hub
+        if: needs.static-analysis.result == 'success' && needs.test-execution.result == 'success' && needs.spec-compliance.result == 'success' && needs.security-gates.result == 'success'
+        # This step holds PRODUCT_HUB_TOKEN — feature_id/hub_slug are parsed
+        # from PR-controlled manifest content and must never be interpolated
+        # into the script text (script-injection hardening; also charset-guarded
+        # at the source in the detect job).
+        env:
+          GH_TOKEN: ${{ secrets.PRODUCT_HUB_TOKEN }}
+          FEATURE_ID: ${{ needs.detect.outputs.feature_id }}
+          HUB_SLUG: ${{ needs.detect.outputs.hub_slug }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          echo "All blocking gates passed — dispatching ci-passed event"
+          echo "  Feature: $FEATURE_ID"
+          echo "  Product Hub: $HUB_SLUG"
+
+          gh api "repos/$HUB_SLUG/dispatches" \
+            -f event_type=ci-passed \
+            -f "client_payload[feature_id]=$FEATURE_ID" \
+            -f "client_payload[source_repo]=$GITHUB_REPOSITORY" \
+            -f "client_payload[timestamp]=$TIMESTAMP"
