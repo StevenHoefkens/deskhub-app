@@ -12,9 +12,14 @@ const props = defineProps<{
   cancelLabel: string
   cancelAria: string
   isCancelling?: boolean
+  showCheckIn?: boolean
+  checkInActionLabel: string
+  checkInActionAria: string
+  checkInPendingLabel: string
+  isCheckingIn?: boolean
 }>()
 
-const emit = defineEmits<{ cancel: [string] }>()
+const emit = defineEmits<{ cancel: [string]; 'check-in': [string] }>()
 </script>
 
 <template>
@@ -33,15 +38,30 @@ const emit = defineEmits<{ cancel: [string] }>()
       <p class="reservation-card__date">{{ props.reservation.date }}</p>
       <p class="reservation-card__slot">{{ slotRangeLabel }}</p>
     </template>
-    <button
-      type="button"
-      class="reservation-card__cancel"
-      :aria-label="cancelAria"
-      :disabled="isCancelling"
-      @click="emit('cancel', props.reservation.id)"
-    >
-      {{ cancelLabel }}
-    </button>
+    <div class="reservation-card__actions">
+      <button
+        v-if="props.showCheckIn"
+        type="button"
+        class="reservation-card__check-in"
+        :aria-label="checkInActionAria"
+        :disabled="isCheckingIn"
+        @click="emit('check-in', props.reservation.id)"
+      >
+        {{ checkInActionLabel }}
+      </button>
+      <button
+        type="button"
+        class="reservation-card__cancel"
+        :aria-label="cancelAria"
+        :disabled="isCancelling"
+        @click="emit('cancel', props.reservation.id)"
+      >
+        {{ cancelLabel }}
+      </button>
+    </div>
+    <p v-if="props.showCheckIn && props.isCheckingIn" class="reservation-card__check-in-status">
+      {{ checkInPendingLabel }}
+    </p>
   </div>
 </template>
 
@@ -65,21 +85,31 @@ const emit = defineEmits<{ cancel: [string] }>()
 .reservation-card__floor,
 .reservation-card__date,
 .reservation-card__granularity,
-.reservation-card__slot {
+.reservation-card__slot,
+.reservation-card__check-in-status {
   color: var(--color-text-muted);
   margin: 0;
 }
 
+.reservation-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.reservation-card__check-in,
 .reservation-card__cancel {
-  align-self: flex-start;
   background: var(--color-surface);
   color: var(--color-text);
   padding: var(--spacing-sm);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
 }
 
+.reservation-card__check-in:disabled,
 .reservation-card__cancel:disabled {
   cursor: not-allowed;
 }

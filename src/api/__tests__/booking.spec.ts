@@ -4,6 +4,7 @@ import {
   reserveDesk,
   listMyReservations,
   cancelReservation,
+  checkInToReservation,
   searchAvailableRooms,
   reserveRoom,
 } from '@/api/booking'
@@ -68,6 +69,13 @@ describe('booking api service', () => {
     await cancelReservation('res 5501')
     const [url, init] = lastRequest()
     expect(url).toContain('/reservations/res%205501/cancel')
+    expect(init.method).toBe('POST')
+  })
+
+  it('posts a check-in to the reservation check-in path with an encoded id', async () => {
+    await checkInToReservation('res 5501')
+    const [url, init] = lastRequest()
+    expect(url).toContain('/reservations/res%205501/check-in')
     expect(init.method).toBe('POST')
   })
 

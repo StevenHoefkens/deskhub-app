@@ -1,0 +1,78 @@
+checkpoint: 4
+name: "Presentation"
+status: passed
+started_at: "2026-07-26T18:57:00Z"
+completed_at: "2026-07-26T19:01:20Z"
+duration_ms: 260000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 40
+  passed: 40
+  failed: 0
+  skipped: 0
+  command: "npx vitest run src/components/booking/reservation-card/reservation-card.spec.ts src/components/booking/reservation-list/reservation-list.spec.ts src/views/booking/__tests__/my-reservations-view.spec.ts"
+files_touched:
+  created: []
+  modified:
+    - src/components/booking/reservation-card/reservation-card.vue
+    - src/components/booking/reservation-card/reservation-card.spec.ts
+    - src/components/booking/reservation-list/reservation-list.vue
+    - src/components/booking/reservation-list/reservation-list.spec.ts
+    - src/lib/i18n/messages.ts
+    - src/views/booking/__tests__/my-reservations-view.spec.ts
+  deleted: []
+reasoning_entries: 4
+tdd_compliance: true
+final_review_fixes: "Traceability Important: rendered the SCR-003 CheckInStatus 'Checking in…' pending element (booking.checkIn.pending key + reservation-card status line + tests) — component tree now fully traced. Traceability Minor: added view-layer list-refresh assertion to the check-in success test. Standards Important: recorded STD-035/038/040 N/A justifications (standards_not_applicable above)."
+verification_evidence:
+  command: "npx vitest run (reservation-card, reservation-list, my-reservations-view) --typecheck"
+  exit_code: 0
+  summary: "40/40 pass, no type errors; check-in button render/emit/hide/disable + list check-in success & error flows green"
+  timestamp: "2026-07-26T19:01:20Z"
+standards_applied:
+  - id: STD-036
+    name: "Vue Component Structure"
+    where: "CheckInButton added to ui-tier reservation-card (data via props, intent via emit); feature-tier reservation-list owns the mutation composable + toast; view unchanged"
+    deviated: false
+  - id: STD-039
+    name: "Vue Component Composition Patterns"
+    where: "typed defineProps/defineEmits ('check-in': [string]); ui tier owns no data/side-effects (Rule 5); feature tier owns useCheckInReservation + toast (Rule 6/7/9/18); config-driven badge unchanged (Rule 19)"
+    deviated: false
+  - id: STD-037
+    name: "Vue API Client & Query Composables"
+    where: "feature component composes useCheckInReservation; success/error side effects (toast, refetch) handled in the feature tier, not the composable"
+    deviated: false
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "ReservationCard PascalCase; check-in props camelCase; kebab-case files/classes (reservation-card__check-in)"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "all visual values bind design tokens var(--color-surface|--color-text|--color-border|--spacing-sm|--radius-card); toast/label strings via i18n keys, none inline. 44px touch-target is a WCAG-mandated a11y minimum from UC-012 constraints, not a themeable value"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "no spec-mapping (// Maps SCR-…) or narration comments in components (STD-039 Rule 11)"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check clean, no vue-tsc warnings"
+    deviated: false
+constraints_applied:
+  - id: UC-012 constraints.md — Accessibility (T-05)
+    where: "check-in button min-height/min-width 44px (touch target); aria-label 'Check in to this desk reservation' for screen readers; actions row wraps at 375px (flex-wrap); mobile stack via existing responsive rules"
+    deviated: false
+design_tokens:
+  recompiled: false
+  reason: "CheckInButton binds only pre-existing tokens (color-surface, color-text, color-border, spacing-sm, radius-card) already present in src/assets/tokens.css; no new token introduced"
+standards_not_applicable:
+  - id: STD-035
+    name: "Scenario-Key Test Binding"
+    reason: "No owned UC Gherkin scenarios in this slice — all UCs (UC-006/007/012) are kind=upstream_dependency owned by deskhub-api. STD-035 Rule 6 binds keys only to tests verifying OWNED scenarios; the app's tests exercise frontend units (predicate, client, composable, components) and are legitimately unkeyed. Scenario-key coverage for UC-012 belongs to the owning service."
+  - id: STD-038
+    name: "Vue Form State & Validation Patterns"
+    reason: "FT-006 adds a single-action check-in button (emit -> mutation composable). No form values, validation, or FormField introduced, so the form-patterns standard has no surface to govern here."
+  - id: STD-040
+    name: "Vue View & Routing Structure"
+    reason: "No new route and no new view. The check-in action lands in the existing reservation-list feature component rendered by the unchanged my-reservations-view; no router or src/views change."

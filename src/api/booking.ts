@@ -6,6 +6,7 @@ import type {
   Reservation,
   MyReservations,
   CancelResult,
+  CheckInResult,
   RoomSearchParams,
   RoomSearchResults,
   ReserveRoomRequest,
@@ -35,6 +36,12 @@ export function listMyReservations(): Promise<MyReservations> {
 
 export function cancelReservation(reservationId: string): Promise<CancelResult> {
   return apiClient<CancelResult>(`/reservations/${encodeURIComponent(reservationId)}/cancel`, {
+    method: 'POST',
+  })
+}
+
+export function checkInToReservation(reservationId: string): Promise<CheckInResult> {
+  return apiClient<CheckInResult>(`/reservations/${encodeURIComponent(reservationId)}/check-in`, {
     method: 'POST',
   })
 }

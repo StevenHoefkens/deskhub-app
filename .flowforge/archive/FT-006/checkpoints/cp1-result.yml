@@ -1,0 +1,49 @@
+checkpoint: 1
+name: "Domain Model & Contracts"
+status: passed
+started_at: "2026-07-26T18:47:30Z"
+completed_at: "2026-07-26T18:48:40Z"
+duration_ms: 70000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 6
+  passed: 6
+  failed: 0
+  skipped: 0
+  command: "npx vitest run src/types/__tests__/check-in-contract.spec.ts --typecheck"
+files_touched:
+  created:
+    - src/types/__tests__/check-in-contract.spec.ts
+    - src/types/contracts/uc-012.ts
+  modified:
+    - src/types/booking.ts
+  deleted: []
+reasoning_entries: 1
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check"
+  exit_code: 0
+  summary: "vue-tsc --build — no errors; 6/6 contract-type assertions pass"
+  timestamp: "2026-07-26T18:48:40Z"
+standards_applied:
+  - id: STD-037
+    name: "Vue API Client & Query Composables"
+    where: "src/types/contracts/uc-012.ts generated from .flowforge/contracts/UC-012 snapshot (Rule 15); CheckInResult re-exported in src/types/booking.ts bound to the generated schema"
+    deviated: false
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "CheckInResult PascalCase type; kebab-case test file name"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "no literals introduced; type-only additions"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "no spec-mapping comments added to generated/domain type files"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check clean, no warnings"
+    deviated: false

@@ -4,29 +4,34 @@ import ReservationCard from '@/components/booking/reservation-card/reservation-c
 import ConfirmDialog from '@/components/shared/ui/confirm-dialog/confirm-dialog.vue'
 import { useMyReservations, getMyReservationsErrorMessage } from '@/composables/use-my-reservations'
 import { useCancelReservation } from '@/composables/use-cancel-reservation'
+import { useCheckInReservation } from '@/composables/use-check-in-reservation'
 import { useToast } from '@/lib/toast'
 import { useI18n } from '@/lib/i18n/use-i18n'
 import {
   checkInBadge,
+  canCheckIn,
   granularityLabelKey,
   formatSlotRange,
   type BadgeVariant,
 } from '@/lib/booking/reservation-display'
-import type { CheckInState } from '@/types/booking'
+import type { CheckInState, ReservationSummary } from '@/types/booking'
 
 const { t } = useI18n()
 const toast = useToast()
 
 const query = useMyReservations()
 const cancel = useCancelReservation()
+const checkIn = useCheckInReservation()
 
 const pendingCancelId = ref<string | null>(null)
+const pendingCheckInId = ref<string | null>(null)
 
 const reservations = computed(() => query.data.value?.reservations ?? [])
 const isLoading = computed(() => query.isLoading.value)
 const isError = computed(() => query.isError.value)
 const errorMessage = computed(() => getMyReservationsErrorMessage(query.error.value ?? null))
 const isCancelPending = computed(() => cancel.isPending.value)
+const isCheckInPending = computed(() => checkIn.isPending.value)
 
 function checkInLabel(state: CheckInState | undefined): string {
   return t(checkInBadge(state).labelKey)
@@ -34,6 +39,23 @@ function checkInLabel(state: CheckInState | undefined): string {
 
 function checkInVariant(state: CheckInState | undefined): BadgeVariant {
   return checkInBadge(state).variant
+}
+
+function eligibleForCheckIn(reservation: ReservationSummary): boolean {
+  return canCheckIn(reservation)
+}
+
+async function performCheckIn(reservationId: string): Promise<void> {
+  pendingCheckInId.value = reservationId
+  try {
+    await checkIn.mutateAsync(reservationId)
+    toast.success(t('booking.checkIn.successToast'))
+  } catch {
+    toast.error(t('booking.checkIn.errorToast'))
+    await query.refetch()
+  } finally {
+    pendingCheckInId.value = null
+  }
 }
 
 function requestCancel(reservationId: string): void {
@@ -80,7 +102,13 @@ async function confirmCancel(): Promise<void> {
       :cancel-label="t('booking.cancel.label')"
       :cancel-aria="t('booking.cancel.aria')"
       :is-cancelling="isCancelPending && pendingCancelId === reservation.id"
+      :show-check-in="eligibleForCheckIn(reservation)"
+      :check-in-action-label="t('booking.checkIn.action.label')"
+      :check-in-action-aria="t('booking.checkIn.action.aria')"
+      :check-in-pending-label="t('booking.checkIn.pending')"
+      :is-checking-in="isCheckInPending && pendingCheckInId === reservation.id"
       @cancel="requestCancel"
+      @check-in="performCheckIn"
     />
 
     <ConfirmDialog

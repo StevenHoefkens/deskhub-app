@@ -1,0 +1,42 @@
+checkpoint: 5
+name: "Deployment Topology"
+status: passed
+started_at: "2026-07-26T18:58:06Z"
+completed_at: "2026-07-26T19:02:15Z"
+duration_ms: 249008
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 464
+  passed: 464
+  failed: 0
+  skipped: 0
+  command: "npm test"
+files_touched:
+  created: []
+  modified: []
+  deleted: []
+reasoning_entries: 6
+tdd_compliance: true
+verification_evidence:
+  command: "npm run build && npm test"
+  exit_code: 0
+  summary: "build ok, bundle 60.4 KB gzipped within 200KB budget, regression 464/464 pass, 0 type errors"
+  timestamp: "2026-07-26T19:01:32Z"
+standards_applied:
+  - id: STD-005
+    name: "Performance Budgets"
+    where: "npm run build postbuild bundle-budget check; measured total JS 60.4 KB gzipped vs the 200 KB initial-load budget (largest chunk index ~45 KB, under 50 KB per-chunk guideline)"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "package.json unchanged for FT-006 — no dependency added"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "build + vue-tsc type-check clean (Type Errors: no errors); no bundle per-chunk warnings"
+    deviated: false
+  - id: STD-020
+    name: "Service README"
+    where: "README requires no change — no new setup/env introduced by FT-006"
+    deviated: false

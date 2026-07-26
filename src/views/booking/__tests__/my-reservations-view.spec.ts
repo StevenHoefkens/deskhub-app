@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n/use-i18n'
 vi.mock('@/api/booking', () => ({
   listMyReservations: vi.fn(() => Promise.resolve({ reservations: [] })),
   cancelReservation: vi.fn(),
+  checkInToReservation: vi.fn(),
 }))
 
 beforeEach(() => {

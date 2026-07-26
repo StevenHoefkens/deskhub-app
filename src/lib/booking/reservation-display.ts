@@ -1,4 +1,4 @@
-import type { CheckInState, Granularity } from '@/types/booking'
+import type { CheckInState, Granularity, ReservationSummary } from '@/types/booking'
 
 export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info'
 
@@ -28,6 +28,10 @@ const UNKNOWN_GRANULARITY_LABEL_KEY = 'booking.granularity.unknown'
 
 export function granularityLabelKey(granularity: Granularity | undefined): string {
   return (granularity && GRANULARITY_LABEL_KEYS[granularity]) ?? UNKNOWN_GRANULARITY_LABEL_KEY
+}
+
+export function canCheckIn(reservation: ReservationSummary): boolean {
+  return reservation.resourceType === 'desk' && reservation.checkInState === 'not_checked_in'
 }
 
 const ISO_TIME_START = 11

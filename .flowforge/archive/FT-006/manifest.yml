@@ -1,0 +1,147 @@
+manifest_schema_version: 2
+service: deskhub-app
+feature:
+  id: FT-006
+  name: Check In To A Reservation
+  slug: check-in-to-a-reservation
+generation_strategy:
+  mode: incremental
+  promotion_tier: new
+  reason: At least one touched pattern is tier=new — forcing incremental for safety.
+  checkpoints:
+    - name: Domain Model & Contracts
+      description: Data models, schemas, event definitions, repository interfaces, API/message contracts
+    - name: Domain Logic & Rules
+      description: Domain services, validation rules, business logic, aggregate behavior, state machines
+    - name: Interface Layer
+      description: API endpoints, event handlers, function entry points, middleware
+    - name: Presentation
+      description: UI components, pages, design token application, client-side state
+      optional: true
+    - name: Deployment Topology
+      description: Infrastructure-as-code, CI/CD configuration, deployment manifests
+  max_retries: 2
+specs:
+  - id: UC-006
+    kind: upstream_dependency
+    action: read
+    path: specs/reservation/UC-006-list-my-reservations
+    files:
+      meta.yml: specs/reservation/UC-006-list-my-reservations/meta.yml
+      scenarios.feature: specs/reservation/UC-006-list-my-reservations/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-006-list-my-reservations/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-006-list-my-reservations/flow.mermaid
+      constraints.md: specs/reservation/UC-006-list-my-reservations/constraints.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 48f59cb83dad374377fdcee88a5690b2805b07eb97877321a094eebdf3bacced
+  - id: UC-007
+    kind: upstream_dependency
+    action: read
+    path: specs/reservation/UC-007-cancel-reservation
+    files:
+      meta.yml: specs/reservation/UC-007-cancel-reservation/meta.yml
+      scenarios.feature: specs/reservation/UC-007-cancel-reservation/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-007-cancel-reservation/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-007-cancel-reservation/flow.mermaid
+      constraints.md: specs/reservation/UC-007-cancel-reservation/constraints.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 70256161df120755485ffcd7d6084f060478906f361fba669d737feadb59380d
+  - id: UC-012
+    kind: upstream_dependency
+    action: create
+    path: specs/reservation/UC-012-check-in-to-a-reservation
+    files:
+      meta.yml: specs/reservation/UC-012-check-in-to-a-reservation/meta.yml
+      scenarios.feature: specs/reservation/UC-012-check-in-to-a-reservation/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-012-check-in-to-a-reservation/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-012-check-in-to-a-reservation/flow.mermaid
+      constraints.md: specs/reservation/UC-012-check-in-to-a-reservation/constraints.md
+      decisions.md: specs/reservation/UC-012-check-in-to-a-reservation/decisions.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 260aec7c87ce7027cb17d95b51b130beaaf032ca8b5a9f6c4c7bc30ec83bc770
+screens:
+  - id: SCR-003
+    action: update
+    path: screens/deskhub-app/booking/SCR-003-my-reservations.yml
+    app: deskhub-app
+    spec_hash: 062873c3eb9b915d3298d3289b5f97c59f2227bc6f1c24170864bcd7d0442a1a
+standards:
+  - id: STD-003
+    name: Naming Conventions
+    category: general
+    path: standards/general/naming-conventions.md
+  - id: STD-005
+    name: Performance Budgets
+    category: nfr
+    path: standards/nfr/performance-budgets.md
+  - id: STD-017
+    name: No Magic Values
+    category: general
+    path: standards/general/STD-017-no-magic-values.md
+  - id: STD-018
+    name: No Unused Dependencies
+    category: general
+    path: standards/general/STD-018-no-unused-dependencies.md
+  - id: STD-019
+    name: Zero Warnings
+    category: general
+    path: standards/general/STD-019-zero-warnings.md
+  - id: STD-020
+    name: Service README
+    category: general
+    path: standards/general/STD-020-service-readme.md
+  - id: STD-032
+    name: Comment Discipline
+    category: general
+    path: standards/general/STD-032-comment-discipline.md
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    category: general
+    path: standards/general/STD-035-scenario-key-binding.md
+  - id: STD-036
+    name: Vue Component Structure
+    category: vue
+    path: standards/vue/STD-036-component-structure.md
+  - id: STD-037
+    name: Vue API Client & Query Composables
+    category: vue
+    path: standards/vue/STD-037-api-client-composables.md
+  - id: STD-038
+    name: Vue Form State & Validation Patterns
+    category: vue
+    path: standards/vue/STD-038-form-patterns.md
+  - id: STD-039
+    name: Vue Component Composition Patterns
+    category: vue
+    path: standards/vue/STD-039-component-patterns.md
+  - id: STD-040
+    name: Vue View & Routing Structure
+    category: vue
+    path: standards/vue/STD-040-view-routing-structure.md
+design_system:
+  app: deskhub-app
+  layers:
+    - design-system/_base/tokens.yml
+    - design-system/deskhub-app/tokens.yml
+  inventory:
+    - design-system/_base/inventory.yml
+    - design-system/deskhub-app/inventory.yml
+code_repos:
+  - service: deskhub-api
+    expected_remote: git@github.com:StevenHoefkens/deskhub-api.git
+  - service: deskhub-app
+    expected_remote: git@github.com:StevenHoefkens/deskhub-app.git
+dependency_build_order:
+  build_order:
+    - UC-012
+  waves:
+    - wave: 1
+      specs:
+        - UC-012
+  critical_path: []
+assembled_at: '2026-07-26T18:42:30.589Z'
+product_hub_commit: 2892076197b84edf2b3f57fd7f538d7bfb836cb7
+product_hub_remote: git@github.com:StevenHoefkens/deskhub.git
