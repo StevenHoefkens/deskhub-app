@@ -5,6 +5,7 @@ import type {
 } from '@/types/contracts/uc-005'
 import type { components as Uc006 } from '@/types/contracts/uc-006'
 import type { components as Uc007 } from '@/types/contracts/uc-007'
+import type { components as Uc012 } from '@/types/contracts/uc-012'
 import type {
   components as Uc010,
   operations as Uc010Operations,
@@ -29,6 +30,8 @@ export type ReservationSummary = Uc006['schemas']['ReservationSummary']
 export type ResourceType = ReservationSummary['resourceType']
 
 export type CancelResult = Uc007['schemas']['CancelResult']
+
+export type CheckInResult = Uc012['schemas']['CheckInResult']
 
 export type AvailableRoom = Uc010['schemas']['AvailableRoom']
 export type RoomSearchResults = Uc010['schemas']['RoomSearchResults']

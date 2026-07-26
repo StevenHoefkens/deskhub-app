@@ -1,0 +1,59 @@
+checkpoint: 3
+name: "Interface Layer"
+status: passed
+started_at: "2026-07-26T18:52:00Z"
+completed_at: "2026-07-26T18:54:12Z"
+duration_ms: 132000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 24
+  passed: 24
+  failed: 0
+  skipped: 0
+  command: "npx vitest run src/api/__tests__/booking.spec.ts src/composables/__tests__/use-check-in-reservation.spec.ts"
+review_findings: "0 critical / 0 important / 3 minor; findings #1 (negative desks-invalidation assertion) and #3 (idempotent-noop passthrough assertion) applied, #2 skipped (matches cancel analog)"
+files_touched:
+  created:
+    - src/composables/use-check-in-reservation.ts
+    - src/composables/__tests__/use-check-in-reservation.spec.ts
+  modified:
+    - src/api/booking.ts
+    - src/api/__tests__/booking.spec.ts
+  deleted: []
+reasoning_entries: 1
+tdd_compliance: true
+verification_evidence:
+  command: "npm run type-check"
+  exit_code: 0
+  summary: "vue-tsc clean; 22/22 tests pass; typed client+composable against generated UC-012 types = compile-time contract conformance (STD-037 R16)"
+  timestamp: "2026-07-26T18:54:12Z"
+standards_applied:
+  - id: STD-037
+    name: "Vue API Client & Query Composables"
+    where: "checkInToReservation() in src/api/booking.ts (one fn per operation, typed Promise<CheckInResult>, Rule 4); useCheckInReservation() wraps useMutation exposing mutate/mutateAsync/isPending/isSuccess/data/fieldErrors/reset (Rule 5/6), fieldErrors via extractErrorInfo (Rule 7), invalidates reservations on success (Rule 8), no toast in composable (Rule 9); compile-time conformance (Rule 16)"
+    deviated: false
+  - id: STD-039
+    name: "Vue Component Composition Patterns"
+    where: "mutation composable owns invalidation + error mapping; side effects (toast) left to feature tier"
+    deviated: false
+  - id: STD-003
+    name: "Naming Conventions"
+    where: "checkInToReservation / useCheckInReservation camelCase; UseCheckInReservationResult PascalCase interface; kebab-case files"
+    deviated: false
+  - id: STD-017
+    name: "No Magic Values"
+    where: "path built with encodeURIComponent + shared RESERVATIONS_QUERY_KEY constant; no literals"
+    deviated: false
+  - id: STD-032
+    name: "Comment Discipline"
+    where: "no spec-mapping or narration comments added"
+    deviated: false
+  - id: STD-018
+    name: "No Unused Dependencies"
+    where: "no new deps; reuses @tanstack/vue-query and existing extractErrorInfo"
+    deviated: false
+  - id: STD-019
+    name: "Zero Warnings"
+    where: "type-check clean, no warnings"
+    deviated: false
