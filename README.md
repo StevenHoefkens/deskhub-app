@@ -1,9 +1,18 @@
 # deskhub-app
 
 The DeskHub web front end (Vue 3 + TypeScript + Vite). It renders the
-authenticated employee experience; the first delivered feature is the SSO login
-page (`/login`), which starts the corporate single-sign-on flow and shows
-localized (EN/NL) login errors.
+authenticated employee experience: SSO login (`/login`), desk booking
+(`/desks`), room booking (`/rooms`), and the employee's reservations
+(`/reservations`). Copy is localized (EN/NL).
+
+## Routes
+
+| Route | Purpose |
+|-------|---------|
+| `/login` | Corporate single-sign-on entry with localized login errors. |
+| `/desks` | Find and reserve a desk (date + granularity + tag filters). |
+| `/rooms` | Find and reserve a room for a 15-minute slot range (date, from/to time, minimum capacity, facility tags). |
+| `/reservations` | The caller's active and upcoming reservations — desks and rooms — with a per-row cancel action. |
 
 ## Prerequisites
 
@@ -37,7 +46,7 @@ convention). Only variables prefixed `VITE_` are exposed to client code.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `VITE_SSO_LOGIN_PATH` | No | `/auth/sso/login` | Backend path the "Sign in with SSO" button redirects to. The recorded return URL is appended as a `returnUrl` query parameter. |
-| `VITE_API_BASE_URL` | No | `/api` | Base URL the booking API client (`src/api/client.ts`) prefixes onto every request (desk search, reserve, list, cancel). Point it at the `deskhub-api` origin when not served behind the same host. |
+| `VITE_API_BASE_URL` | No | `/api` | Base URL the booking API client (`src/api/client.ts`) prefixes onto every request (desk search, room search, reserve, list, cancel). Point it at the `deskhub-api` origin when not served behind the same host. |
 
 ## Running Tests
 

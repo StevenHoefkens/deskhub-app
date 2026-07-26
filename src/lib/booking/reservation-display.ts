@@ -14,8 +14,8 @@ const CHECK_IN_BADGES: Record<CheckInState, BadgeConfig> = {
 
 const UNKNOWN_BADGE: BadgeConfig = { labelKey: 'booking.checkIn.unknown', variant: 'neutral' }
 
-export function checkInBadge(state: CheckInState): BadgeConfig {
-  return CHECK_IN_BADGES[state] ?? UNKNOWN_BADGE
+export function checkInBadge(state: CheckInState | undefined): BadgeConfig {
+  return (state && CHECK_IN_BADGES[state]) ?? UNKNOWN_BADGE
 }
 
 const GRANULARITY_LABEL_KEYS: Record<Granularity, string> = {
@@ -26,6 +26,24 @@ const GRANULARITY_LABEL_KEYS: Record<Granularity, string> = {
 
 const UNKNOWN_GRANULARITY_LABEL_KEY = 'booking.granularity.unknown'
 
-export function granularityLabelKey(granularity: Granularity): string {
-  return GRANULARITY_LABEL_KEYS[granularity] ?? UNKNOWN_GRANULARITY_LABEL_KEY
+export function granularityLabelKey(granularity: Granularity | undefined): string {
+  return (granularity && GRANULARITY_LABEL_KEYS[granularity]) ?? UNKNOWN_GRANULARITY_LABEL_KEY
+}
+
+const ISO_TIME_START = 11
+const ISO_TIME_END = 16
+const SLOT_RANGE_SEPARATOR = '–'
+
+function wallClockTime(isoDateTime: string): string {
+  return isoDateTime.slice(ISO_TIME_START, ISO_TIME_END)
+}
+
+export function formatSlotRange(
+  startsAt: string | undefined,
+  endsAt: string | undefined,
+): string {
+  if (!startsAt || !endsAt) {
+    return ''
+  }
+  return `${wallClockTime(startsAt)}${SLOT_RANGE_SEPARATOR}${wallClockTime(endsAt)}`
 }

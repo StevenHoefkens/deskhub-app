@@ -6,6 +6,10 @@ import type {
   Reservation,
   MyReservations,
   CancelResult,
+  RoomSearchParams,
+  RoomSearchResults,
+  ReserveRoomRequest,
+  RoomReservation,
 } from '@/types/booking'
 
 export function searchAvailableDesks(params: DeskSearchParams): Promise<DeskSearchResults> {
@@ -32,5 +36,26 @@ export function listMyReservations(): Promise<MyReservations> {
 export function cancelReservation(reservationId: string): Promise<CancelResult> {
   return apiClient<CancelResult>(`/reservations/${encodeURIComponent(reservationId)}/cancel`, {
     method: 'POST',
+  })
+}
+
+export function searchAvailableRooms(params: RoomSearchParams): Promise<RoomSearchResults> {
+  const query = new URLSearchParams()
+  query.set('date', params.date)
+  query.set('startTime', params.startTime)
+  query.set('endTime', params.endTime)
+  if (params.minCapacity !== undefined) {
+    query.set('minCapacity', String(params.minCapacity))
+  }
+  for (const tag of params.tags ?? []) {
+    query.append('tags', tag)
+  }
+  return apiClient<RoomSearchResults>(`/rooms?${query.toString()}`)
+}
+
+export function reserveRoom(roomId: string, body: ReserveRoomRequest): Promise<RoomReservation> {
+  return apiClient<RoomReservation>(`/rooms/${encodeURIComponent(roomId)}/reservations`, {
+    method: 'POST',
+    body: JSON.stringify(body),
   })
 }

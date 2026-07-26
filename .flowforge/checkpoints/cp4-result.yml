@@ -1,0 +1,107 @@
+checkpoint: 4
+name: Presentation
+status: passed
+started_at: '2026-07-26T17:40:00Z'
+completed_at: '2026-07-26T18:05:00Z'
+duration_ms: 1500000
+attempts: 2
+max_attempts: 3
+test_summary:
+  total: 426
+  passed: 426
+  failed: 0
+  skipped: 0
+  command: npm test
+verification_evidence:
+  command: npm test
+  exit_code: 0
+  summary: >-
+    vitest run — 426 passed (86 files), no type errors; SCR-004 room finder + SCR-003 desk/room
+    reservation card covered. npm run lint exit 0 (zero warnings). ie design-system compile — tokens unchanged.
+    (final count after final-review fixes: single updateField helper + removed dead validateReserveRoom.)
+  timestamp: '2026-07-26T18:05:00Z'
+files_touched:
+  created:
+    - src/components/booking/room-card/room-card.vue
+    - src/components/booking/room-card/room-card.spec.ts
+    - src/components/booking/room-search-form/room-search-form.vue
+    - src/components/booking/room-search-form/room-search-form.spec.ts
+    - src/components/booking/room-finder/room-finder.vue
+    - src/components/booking/room-finder/room-finder.spec.ts
+    - src/views/booking/find-room-view.vue
+    - src/views/booking/__tests__/find-room-view.spec.ts
+  modified:
+    - src/components/booking/reservation-card/reservation-card.vue
+    - src/components/booking/reservation-card/reservation-card.spec.ts
+    - src/components/booking/reservation-list/reservation-list.vue
+    - src/components/booking/reservation-list/reservation-list.spec.ts
+    - src/lib/booking/reservation-display.ts
+    - src/lib/booking/__tests__/reservation-display.spec.ts
+    - src/lib/i18n/messages.ts
+    - src/router/index.ts
+    - src/router/__tests__/router.spec.ts
+  deleted: []
+reasoning_entries: 5
+tdd_compliance: true
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: room-card/room-search-form/room-finder (PascalCase components, kebab-case dirs/files); camelCase handlers
+    deviated: false
+  - id: STD-005
+    name: Performance Budgets
+    where: >-
+      results list under 50 items — no virtualization needed; search is form-submit (not typeahead) so the
+      300ms debounce rule does not apply (consistent with desk-finder); loading feedback via isSubmitting/isReserving
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: field-id constants; ISO_TIME_START/END + SLOT_RANGE_SEPARATOR in reservation-display; i18n keys for copy
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: no new deps; reuses FormField/TagFilterInput/StatusBadge and TanStack composables
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: npm test + npm run lint both exit 0, no warnings
+    deviated: false
+  - id: STD-020
+    name: Service README
+    where: no README change at CP4; owned by CP5
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: new SFCs carry no spec/standard citations; only two justified why-comments in screen source retained as domain notes are absent (none added)
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: no owned scenarios; component/view tests carry no keys (Rule 6)
+    deviated: false
+  - id: STD-036
+    name: Vue Component Structure
+    where: >-
+      ui tier (room-card, room-search-form) pure — data via props, intent via typed emits, no fetching;
+      feature tier (room-finder) owns composables/state; list item extracted as ui component; tokens as CSS vars
+    deviated: false
+  - id: STD-037
+    name: Vue API Client & Query Composables (feature consumption)
+    where: room-finder consumes useRoomSearch/useReserveRoom; owns toast side effects (not the composable)
+    deviated: false
+  - id: STD-038
+    name: Vue Form State & Validation Patterns
+    where: >-
+      room-finder single reactive values + errors record; ONE generic updateField(field, value) helper
+      updates the value and clears that field's error (STD-038 Rule 3); validateRoomSearch returns FieldError[];
+      FormField role=alert/aria-live, aria-invalid + aria-describedby
+    deviated: false
+  - id: STD-039
+    name: Vue Component Composition Patterns
+    where: typed defineProps/defineEmits, no any; feature maps responses to child props explicitly; StatusBadge config-driven
+    deviated: false
+  - id: STD-040
+    name: Vue View & Routing Structure
+    where: >-
+      find-room-view thin route entry delegating to room-finder; lazy import() in router; responsive max-width content;
+      loading/error via feature query state
+    deviated: false

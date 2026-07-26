@@ -1,0 +1,202 @@
+format_version: "1.0"
+feature: "FT-005"
+agent_runtime: "claude-code"
+model: "claude-opus-4-8"
+generated_at: "2026-07-26T18:15:00Z"
+entries:
+  - id: "INT-001"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "All UC specs are upstream_dependency"
+    decision: "Generate client integration + screens only; no backend/domain implementation for UC-006/007/010/011."
+    reasoning: "Manifest v2 marks every spec kind: upstream_dependency (owned by deskhub-api). This slice's generation contract is SCR-003/SCR-004; frontend code-to-contract conformance is compile-time via contract-generated types."
+    risk: "low"
+    spec_ref: "manifest specs[]; UC-006/007/010/011 meta.yml (service: deskhub-api)"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/types/booking.ts"
+  - id: "INT-002"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "UC-006 ReservationSummary widened to a resource-discriminated shape"
+    decision: "Widened display helpers (checkInBadge, granularityLabelKey) and reservation-list to tolerate absent desk fields; deferred full room-row rendering to CP4."
+    reasoning: "Regenerated UC-006 makes resourceType required and granularity/checkInState/room fields optional. Existing desk-only card/list broke at compile; minimal forward-compatible guards keep the type gate green without prematurely building CP4 UI."
+    risk: "medium"
+    spec_ref: "UC-006 contract.openapi.yml ReservationSummary; SCR-003"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/lib/booking/reservation-display.ts"
+      - "src/components/booking/reservation-list/reservation-list.vue"
+  - id: "INT-003"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "RoomSearchParams derivation"
+    decision: "Derive RoomSearchParams from operations['searchAvailableRooms'].parameters.query via NonNullable."
+    reasoning: "Mirrors the existing DeskSearchParams pattern so query params stay contract-bound (required date/startTime/endTime; optional minCapacity/tags)."
+    risk: "low"
+    spec_ref: "UC-010 contract.openapi.yml GET /rooms"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/types/booking.ts"
+  - id: "INT-004"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Room slot-range client validation with no booking-horizon cap"
+    decision: "Validate 15-min alignment, end strictly after start, and date not before today; deliberately do NOT apply the 30-day horizon that desks use."
+    reasoning: "UC-010/UC-011 constraints.md state 'No upper booking horizon' for rooms, unlike desks. Server remains the authority for availability/concurrency/exact past-time."
+    risk: "medium"
+    spec_ref: "UC-010/UC-011 constraints.md (Slot model); decisions.md"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/validation/room.ts"
+      - "src/lib/booking/slot-range.ts"
+  - id: "INT-005"
+    checkpoint: 2
+    type: "assumption"
+    subject: "minCapacity client check"
+    decision: "Reject minCapacity that is not an integer >= 1."
+    reasoning: "Contract declares minCapacity integer, minimum: 1. Client pre-check mirrors that; server still authoritative."
+    risk: "low"
+    spec_ref: "UC-010 contract.openapi.yml minCapacity"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/validation/room.ts"
+  - id: "INT-006"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Same-day range accepted; intra-day past-time left to server"
+    decision: "Client rejects only a past date (date < today); a same-day range whose start already passed is left for the server to reject with INVALID_DATE."
+    reasoning: "UC-011 allows same-day booking while the range has not started; the exact intra-day past-time boundary depends on server wall-clock, so the client does not pre-empt it."
+    risk: "low"
+    spec_ref: "UC-011 scenarios.feature (same-day allowed; range-in-past rejected)"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/validation/room.ts"
+  - id: "INT-007"
+    checkpoint: 3
+    type: "interpretation"
+    subject: "reserveRoom takes roomId (path) plus body"
+    decision: "api reserveRoom(roomId, body); composable wraps a ReserveRoomVariables object so useMutation gets a single variable."
+    reasoning: "UC-011 puts roomId in the path and date/startTime/endTime in the body; useMutation's mutationFn takes one argument, so a {roomId, body} variables object is the natural shape."
+    risk: "low"
+    spec_ref: "UC-011 contract.openapi.yml POST /rooms/{roomId}/reservations"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/api/booking.ts"
+      - "src/composables/use-reserve-room.ts"
+  - id: "INT-008"
+    checkpoint: 3
+    type: "assumption"
+    subject: "Reused shared field-error extractor"
+    decision: "use-reserve-room reuses extractErrorInfo exported from use-reserve-desk."
+    reasoning: "The Error.details -> FieldError mapping is identical across UC-004 and UC-011 (shared Error schema). Reuse mirrors the existing use-cancel-reservation approach."
+    risk: "low"
+    spec_ref: "UC-011 contract.openapi.yml Error"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/composables/use-reserve-room.ts"
+  - id: "INT-009"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Interim design-token bindings for action buttons"
+    decision: "Search/reserve buttons use color-surface-alt / color-surface+border; cancel uses color-surface+border."
+    reasoning: "SCR-003/SCR-004 component trees document these as interim change-requests because no color-primary/color-danger token exists yet. Bound to existing tokens per the screen spec; not a realization gap (button has no inventory impl -> token-rendered)."
+    risk: "low"
+    spec_ref: "SCR-004 SearchButton/ReserveButton; SCR-003 CancelButton"
+    standard_ref: "STD-036"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/room-search-form/room-search-form.vue"
+      - "src/components/booking/room-card/room-card.vue"
+  - id: "INT-010"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Room slot-range display"
+    decision: "Render a room reservation's slot range as HH:MM–HH:MM sliced from the ISO offset datetime (wall-clock as stored)."
+    reasoning: "SCR-003 shows startsAt/endsAt for room rows; the contract examples carry an explicit offset. Slicing the wall-clock avoids re-interpreting the instant in the browser's local timezone. Combining the two properties into one range label preserves both while reading cleanly."
+    risk: "medium"
+    spec_ref: "SCR-003 ReservationStart/ReservationEnd; UC-006 startsAt/endsAt"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/lib/booking/reservation-display.ts"
+  - id: "INT-011"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Resource-neutral cancel copy"
+    decision: "Cancel confirm/success messages say 'the resource' instead of 'the desk'."
+    reasoning: "SCR-003 now lists both desk and room reservations through one cancel action; the copy must not assume a desk."
+    risk: "low"
+    spec_ref: "SCR-003 cancel-reservation orchestration"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/lib/i18n/messages.ts"
+  - id: "INT-012"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Room reserve refetches on both outcomes"
+    decision: "After a room reserve attempt, refetch the search on both success and error."
+    reasoning: "SCR-004 reserve-room orchestration refreshes room-results on both on_success and on_error (a booking, or a lost race, both change availability). Desk-finder refetched only on error; rooms differ per spec."
+    risk: "low"
+    spec_ref: "SCR-004 reserve-room orchestration (on_success/on_error refresh)"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/room-finder/room-finder.vue"
+  - id: "INT-013"
+    checkpoint: 4
+    type: "assumption"
+    subject: "Room card field labels"
+    decision: "Show floor and capacity with short i18n label prefixes (Floor / Capacity)."
+    reasoning: "SCR-004 lists floor and maxCapacity as separate display fields (one per response property, ADR-0094); bare numbers are ambiguous, so a localized prefix aids comprehension without adding data."
+    risk: "low"
+    spec_ref: "SCR-004 RoomFloor/RoomCapacity"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/room-card/room-card.vue"
+  - id: "INT-014"
+    checkpoint: 5
+    type: "assumption"
+    subject: "No infrastructure changes for a frontend slice"
+    decision: "CP5 is limited to production build, bundle-budget enforcement, README, and full regression."
+    reasoning: "This slice adds no new runtime dependency, service, or CI stage; the existing Vite build + bundle-budget script already cover deployment topology."
+    risk: "low"
+    spec_ref: "manifest CP5 expectation"
+    standard_ref: "STD-005"
+    spec_gap: false
+    files_affected:
+      - "README.md"
+  - id: "INT-015"
+    checkpoint: 4
+    type: "deviation"
+    subject: "Form update handlers consolidated (final-review fix)"
+    decision: "Replaced five per-field update handlers in room-finder with a single generic updateField(field, value) helper."
+    reasoning: "STD-038 Rule 3 mandates one updateField helper, not one handler per field. The initial CP4 output used per-field handlers; the final standards review flagged it and it was refactored before finalization."
+    risk: "low"
+    spec_ref: "SCR-004"
+    standard_ref: "STD-038"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/room-finder/room-finder.vue"
+  - id: "INT-016"
+    checkpoint: 4
+    type: "deviation"
+    subject: "Removed dead validateReserveRoom export (final-review fix)"
+    decision: "Dropped validateReserveRoom and its tests."
+    reasoning: "STD-018: the reserve flow builds its request from already-validated search params, so validateReserveRoom had no production consumer. Removed to avoid a dead export."
+    risk: "low"
+    spec_ref: "UC-011"
+    standard_ref: "STD-018"
+    spec_gap: false
+    files_affected:
+      - "src/validation/room.ts"

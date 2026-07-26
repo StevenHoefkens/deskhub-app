@@ -7,7 +7,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the authenticated employee's own active and upcoming desk reservations */
+        /** List the authenticated employee's own active and upcoming reservations (desks and rooms) */
         get: operations["listMyReservations"];
         put?: never;
         post?: never;
@@ -22,7 +22,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         MyReservations: {
-            /** @description The caller's active and upcoming desk reservations; empty when none */
+            /** @description The caller's active and upcoming reservations across resource types (desks and rooms); empty when none */
             reservations: components["schemas"]["ReservationSummary"][];
         };
         ReservationSummary: {
@@ -31,10 +31,12 @@ export interface components {
              * @example b2c4a1e0-7f3d-4a9b-8c11-0d2e5f6a7b8c
              */
             id: string;
-            /** @example desk-2b-014 */
-            deskId: string;
-            /** @example zone-2b */
-            zoneId: string;
+            /**
+             * @description Which kind of resource this reservation is for
+             * @example desk
+             * @enum {string}
+             */
+            resourceType: "desk" | "room";
             /**
              * @description Floor label (may be negative, e.g. -1)
              * @example 2
@@ -45,17 +47,45 @@ export interface components {
              * @example 2026-07-27
              */
             date: string;
-            granularity: components["schemas"]["Granularity"];
             /**
              * @example active
              * @enum {string}
              */
             status: "active" | "cancelled" | "no_show";
             /**
+             * @description Desk identifier — present when resourceType is desk
+             * @example desk-2b-014
+             */
+            deskId?: string;
+            /**
+             * @description Zone of the desk — present when resourceType is desk
+             * @example zone-2b
+             */
+            zoneId?: string;
+            granularity?: components["schemas"]["Granularity"];
+            /**
+             * @description Check-in flag — present only when resourceType is desk; room reservations have no check-in state
              * @example not_checked_in
              * @enum {string}
              */
-            checkInState: "not_checked_in" | "checked_in";
+            checkInState?: "not_checked_in" | "checked_in";
+            /**
+             * @description Room identifier — present when resourceType is room
+             * @example room-3-201
+             */
+            roomId?: string;
+            /**
+             * Format: date-time
+             * @description Inclusive start of the reserved slot range — present when resourceType is room
+             * @example 2026-07-27T10:00:00+02:00
+             */
+            startsAt?: string;
+            /**
+             * Format: date-time
+             * @description Exclusive end of the reserved slot range — present when resourceType is room
+             * @example 2026-07-27T11:00:00+02:00
+             */
+            endsAt?: string;
         };
         /**
          * @description Booking granularity — a full day, or the morning or afternoon half-day
@@ -65,7 +95,7 @@ export interface components {
         Granularity: "FULL_DAY" | "MORNING" | "AFTERNOON";
         Error: {
             /**
-             * @description Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: SESSION_EXPIRED.
+             * @description Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: SESSION_EXPIRED, UNAUTHENTICATED.
              * @example SESSION_EXPIRED
              */
             code: string;
@@ -102,7 +132,7 @@ export interface operations {
                     "application/json": components["schemas"]["MyReservations"];
                 };
             };
-            /** @description No valid session — the caller is unauthenticated or the session has expired */
+            /** @description No valid session — the caller is unauthenticated (UNAUTHENTICATED) or the session has expired (SESSION_EXPIRED) */
             401: {
                 headers: {
                     [name: string]: unknown;
