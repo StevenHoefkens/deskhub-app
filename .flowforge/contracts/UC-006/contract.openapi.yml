@@ -3,6 +3,10 @@ info:
   title: "List my reservations"
   version: "1.0.0"
 
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
 paths:
   /reservations:
     get:
@@ -10,6 +14,8 @@ paths:
       summary: "List the authenticated employee's own active and upcoming desk reservations"
       tags:
         - "reservation"
+      security:
+        - sessionCookie: []
       responses:
         "200":
           description: "The caller's reservations (may be empty)"
@@ -25,6 +31,12 @@ paths:
                 $ref: "#/components/schemas/Error"
 
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
   schemas:
     # --- Response Schema (the success data body, camelCase, unwrapped) ---
     MyReservations:

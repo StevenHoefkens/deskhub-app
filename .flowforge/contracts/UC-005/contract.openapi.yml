@@ -3,6 +3,10 @@ info:
   title: "Search available desks"
   version: "1.0.0"
 
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
 paths:
   /desks:
     get:
@@ -10,6 +14,8 @@ paths:
       summary: "Search available desks for a date, granularity and tag filters, scoped to the employee's bookable zones"
       tags:
         - "reservation"
+      security:
+        - sessionCookie: []
       parameters:
         - name: date
           in: query
@@ -51,6 +57,12 @@ paths:
                 $ref: "#/components/schemas/Error"
 
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
   schemas:
     # --- Response Schema (the success data body, camelCase, unwrapped) ---
     DeskSearchResults:

@@ -3,6 +3,10 @@ info:
   title: "Cancel a reservation"
   version: "1.0.0"
 
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
 paths:
   /reservations/{reservationId}/cancel:
     post:
@@ -10,6 +14,8 @@ paths:
       summary: "Cancel the caller's own reservation before its range ends and free the desk"
       tags:
         - "reservation"
+      security:
+        - sessionCookie: []
       parameters:
         - name: reservationId
           in: path
@@ -45,6 +51,12 @@ paths:
                 $ref: "#/components/schemas/Error"
 
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
   schemas:
     # --- Response Schema (the success data body, camelCase, unwrapped) ---
     CancelResult:

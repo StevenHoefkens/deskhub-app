@@ -3,6 +3,10 @@ info:
   title: "Reserve a desk"
   version: "1.0.0"
 
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
 paths:
   /reservations:
     post:
@@ -10,6 +14,8 @@ paths:
       summary: "Reserve an available desk for a date and granularity"
       tags:
         - "reservation"
+      security:
+        - sessionCookie: []
       requestBody:
         required: true
         content:
@@ -49,6 +55,12 @@ paths:
                 $ref: "#/components/schemas/Error"
 
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
   schemas:
     # --- Request Schema (camelCase, unwrapped) ---
     ReserveDeskRequest:
