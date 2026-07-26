@@ -34,6 +34,10 @@ const baseProps = {
   slotRangeLabel: '',
   cancelLabel: 'Cancel',
   cancelAria: 'Cancel this reservation',
+  showCheckIn: true,
+  checkInActionLabel: 'Check in',
+  checkInActionAria: 'Check in to this desk reservation',
+  checkInPendingLabel: 'Checking in…',
 }
 
 describe('ReservationCard', () => {
@@ -70,5 +74,34 @@ describe('ReservationCard', () => {
   it('disables the cancel button while cancelling', () => {
     const wrapper = mount(ReservationCard, { props: { ...baseProps, isCancelling: true } })
     expect(wrapper.get('.reservation-card__cancel').attributes('disabled')).toBeDefined()
+  })
+
+  it('renders a labelled check-in button for an eligible desk row', () => {
+    const wrapper = mount(ReservationCard, { props: baseProps })
+    const button = wrapper.get('.reservation-card__check-in')
+    expect(button.text()).toBe('Check in')
+    expect(button.attributes('aria-label')).toBe('Check in to this desk reservation')
+  })
+
+  it('emits check-in with the reservation id', async () => {
+    const wrapper = mount(ReservationCard, { props: baseProps })
+    await wrapper.get('.reservation-card__check-in').trigger('click')
+    expect(wrapper.emitted('check-in')?.[0]).toEqual(['res-5501'])
+  })
+
+  it('hides the check-in button when the row is not eligible', () => {
+    const wrapper = mount(ReservationCard, { props: { ...baseProps, showCheckIn: false } })
+    expect(wrapper.find('.reservation-card__check-in').exists()).toBe(false)
+  })
+
+  it('disables the check-in button and shows the pending status while checking in', () => {
+    const wrapper = mount(ReservationCard, { props: { ...baseProps, isCheckingIn: true } })
+    expect(wrapper.get('.reservation-card__check-in').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.reservation-card__check-in-status').text()).toBe('Checking in…')
+  })
+
+  it('shows no pending status when not checking in', () => {
+    const wrapper = mount(ReservationCard, { props: baseProps })
+    expect(wrapper.find('.reservation-card__check-in-status').exists()).toBe(false)
   })
 })

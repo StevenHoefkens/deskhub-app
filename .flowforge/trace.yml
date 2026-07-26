@@ -1,0 +1,130 @@
+format_version: "1.0"
+feature: "FT-006"
+agent_runtime: "claude-code"
+model: "claude-opus-4-8"
+generated_at: "2026-07-26T19:09:00Z"
+entries:
+  - id: "INT-001"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "Upstream-only slice reduces CP1 to contract consumption"
+    decision: "Generated no owned domain model; CP1 scope = generate the consumed UC-012 contract types and re-export CheckInResult in the domain barrel with a compile-time binding test."
+    reasoning: "All UC specs in the manifest are kind=upstream_dependency (owned by deskhub-api). This repo owns only screen SCR-003, so there is no owned entity/repository/DTO to generate here."
+    risk: "low"
+    spec_ref: "manifest.specs[*].kind=upstream_dependency; UC-012 meta.yml service=deskhub-api"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/types/booking.ts"
+      - "src/types/contracts/uc-012.ts"
+      - "src/types/__tests__/check-in-contract.spec.ts"
+  - id: "INT-002"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "canCheckIn predicate matches SCR-003 visibleWhen verbatim"
+    decision: "canCheckIn(reservation) = resourceType==='desk' && checkInState==='not_checked_in'; no status guard added."
+    reasoning: "SCR-003 CheckInButton.visibleWhen is exactly that predicate. A status==='active' guard would be an unspecified assumption — UC-006 already returns only the active-and-upcoming set, and the screen's visibleWhen deliberately omits status."
+    risk: "low"
+    spec_ref: "SCR-003 reservations-list.CheckInButton.props.visibleWhen"
+    standard_ref: "STD-039"
+    spec_gap: false
+    files_affected:
+      - "src/lib/booking/reservation-display.ts"
+  - id: "INT-003"
+    checkpoint: 2
+    type: "assumption"
+    subject: "Check-in window enforced server-side only"
+    decision: "No client-side check-in-window/time logic generated; the button is shown for any not-checked-in desk row and window refusals surface via the error toast."
+    reasoning: "UC-012 constraints.md and the SCR-003 CheckInButton comment state the window is enforced server-side and must not be reimplemented on the client."
+    risk: "low"
+    spec_ref: "UC-012 constraints.md Business Rules; SCR-003 CheckInButton comment"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/lib/booking/reservation-display.ts"
+  - id: "INT-004"
+    checkpoint: 3
+    type: "interpretation"
+    subject: "Check-in invalidates only the reservations query, not desks"
+    decision: "useCheckInReservation onSuccess invalidates RESERVATIONS_QUERY_KEY only (cancel invalidates both reservations and desks)."
+    reasoning: "Check-in confirms occupancy of an already-held desk; it does not change desk availability, so desk-search results cannot change. Cancel frees a desk, hence its broader invalidation."
+    risk: "low"
+    spec_ref: "UC-012 postconditions; contrast UC-007 cancel"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/composables/use-check-in-reservation.ts"
+  - id: "INT-005"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "CheckInButton placement and gating"
+    decision: "Rendered in the ui-tier card gated by showCheckIn (=canCheckIn from the feature tier), in an actions row alongside the cancel button; intent emitted as 'check-in'."
+    reasoning: "SCR-003 places CheckInButton in the ReservationRow next to CancelButton; STD-036/039 require the ui tier to receive data via props and emit intent."
+    risk: "low"
+    spec_ref: "SCR-003 reservations-list.ReservationRow.CheckInButton"
+    standard_ref: "STD-036"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/reservation-card/reservation-card.vue"
+      - "src/components/booking/reservation-list/reservation-list.vue"
+  - id: "INT-006"
+    checkpoint: 4
+    type: "assumption"
+    subject: "No confirmation dialog for check-in"
+    decision: "Check-in triggers the mutation directly on click; no ConfirmDialog (unlike cancel)."
+    reasoning: "SCR-003 CheckInButton has no requiresConfirm/confirmMessage, whereas CancelButton sets requiresConfirm: true. Check-in is a low-risk, reversible-by-time affordance."
+    risk: "low"
+    spec_ref: "SCR-003 CheckInButton.props (no requiresConfirm) vs CancelButton.props.requiresConfirm"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/reservation-list/reservation-list.vue"
+  - id: "INT-007"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "44x44px touch target as a raw value, not a token"
+    decision: "min-height/min-width: 44px on the action buttons; aria-label + flex-wrap for 375px reachability."
+    reasoning: "UC-012 constraints.md T-05 requires a >=44x44px touch target, 375px operability, and a screen-reader label. 44px is a WCAG-mandated a11y minimum, not a themeable design value, so it is not bound to a design token (STD-017 scopes token-binding to colour/spacing/radius/typography)."
+    risk: "low"
+    spec_ref: "UC-012 constraints.md Accessibility (T-05)"
+    standard_ref: "STD-017"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/reservation-card/reservation-card.vue"
+  - id: "INT-008"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "CheckInStatus 'Checking in…' realized as an inline card status line"
+    decision: "Rendered the SCR-003 check-in-reservation section's CheckInStatus (visibleWhen pending) as an inline status paragraph in the card, shown while isCheckingIn (via booking.checkIn.pending)."
+    reasoning: "The cancel section's CancelStatus is realized through the ConfirmDialog pending-label, but check-in has no dialog, so its pending status is surfaced inline next to the button. Added during final-review to fully trace the owned component tree (traceability lens Important finding)."
+    risk: "low"
+    spec_ref: "SCR-003 check-in-reservation.CheckInAction.CheckInStatus"
+    standard_ref: "STD-036"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/reservation-card/reservation-card.vue"
+      - "src/lib/i18n/messages.ts"
+  - id: "INT-009"
+    checkpoint: 5
+    type: "assumption"
+    subject: "Deployment topology unchanged"
+    decision: "No Dockerfile/CI/compose/env/dependency change; FT-006 is a pure-frontend feature verified by build + bundle-budget + regression."
+    reasoning: "The feature adds a client call to an existing upstream endpoint and UI on an existing screen; no new runtime input, dependency, or build step. Bundle 60.4 KB gzip vs 200 KB budget."
+    risk: "low"
+    spec_ref: "manifest (no infra deltas); STD-005"
+    standard_ref: "STD-005"
+    spec_gap: false
+    files_affected: []
+  - id: "INT-010"
+    checkpoint: 4
+    type: "alternative_rejected"
+    subject: "Server error text not reflected into the toast"
+    decision: "Error toast uses a fixed client-side i18n string; the caught error is not bound and its server message is not echoed to the DOM. useCheckInReservation.fieldErrors carries server text but is intentionally never rendered on this feature."
+    reasoning: "Security lens: avoid reflecting attacker-influenceable server text into the DOM. Fixed messages match the SCR-003 orchestration copy. Any future binding of fieldErrors must use escaped interpolation, never v-html."
+    risk: "low"
+    spec_ref: "SCR-003 orchestration check-in-reservation on_error"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/reservation-list/reservation-list.vue"
+      - "src/composables/use-check-in-reservation.ts"
