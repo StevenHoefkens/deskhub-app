@@ -15,7 +15,8 @@ const emit = defineEmits<{ reserve: [string] }>()
 <template>
   <div class="desk-card">
     <p class="desk-card__label">{{ props.desk.deskId }}</p>
-    <p class="desk-card__location">{{ props.desk.zoneId }} · {{ props.desk.floor }}</p>
+    <p class="desk-card__zone">{{ props.desk.zoneId }}</p>
+    <p class="desk-card__floor">{{ props.desk.floor }}</p>
     <p v-if="props.desk.tags.length > 0" class="desk-card__tags">{{ props.desk.tags.join(', ') }}</p>
     <p v-if="isReserving" class="desk-card__status">{{ pendingLabel }}</p>
     <button
@@ -46,7 +47,8 @@ const emit = defineEmits<{ reserve: [string] }>()
   margin: 0;
 }
 
-.desk-card__location,
+.desk-card__zone,
+.desk-card__floor,
 .desk-card__tags,
 .desk-card__status {
   color: var(--color-text-muted);

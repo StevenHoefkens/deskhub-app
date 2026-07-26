@@ -19,8 +19,10 @@ const emit = defineEmits<{ cancel: [string] }>()
 <template>
   <div class="reservation-card">
     <p class="reservation-card__label">{{ props.reservation.deskId }}</p>
-    <p class="reservation-card__location">{{ props.reservation.zoneId }} · {{ props.reservation.floor }}</p>
-    <p class="reservation-card__when">{{ props.reservation.date }} · {{ granularityLabel }}</p>
+    <p class="reservation-card__zone">{{ props.reservation.zoneId }}</p>
+    <p class="reservation-card__floor">{{ props.reservation.floor }}</p>
+    <p class="reservation-card__date">{{ props.reservation.date }}</p>
+    <p class="reservation-card__granularity">{{ granularityLabel }}</p>
     <StatusBadge :label="checkInLabel" :variant="checkInVariant" />
     <button
       type="button"
@@ -50,8 +52,10 @@ const emit = defineEmits<{ cancel: [string] }>()
   margin: 0;
 }
 
-.reservation-card__location,
-.reservation-card__when {
+.reservation-card__zone,
+.reservation-card__floor,
+.reservation-card__date,
+.reservation-card__granularity {
   color: var(--color-text-muted);
   margin: 0;
 }

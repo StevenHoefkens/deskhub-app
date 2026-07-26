@@ -211,6 +211,19 @@ entries:
     spec_gap: false
     files_affected:
       - "README.md"
+  - id: "INT-019"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "ADR-0094 rendered-binding: split composite display fields"
+    decision: "On delta re-generation against refreshed screens (hub a715a31), split the card display fields to one element per response property: desk-card -> zoneId + floor; reservation-card -> zoneId + floor + date + granularity. Removed the combined 'zoneId · floor' / 'date · granularity' renders."
+    reasoning: "ADR-0094 rendered-binding requires each screen display field to name a single real property of the UC success response schema; the hub split SCR-002 DeskRow and SCR-003 ReservationRow accordingly. Components mirror the split for 1:1 code<->screen traceability. Error-body binding (search/list error notices) is explicitly not traversed by the check (FT-001 precedent), so INT-016's inline notice remains valid and is no longer a spec gap."
+    risk: "low"
+    spec_ref: "SCR-002 desk-results DeskRow; SCR-003 reservations-list ReservationRow"
+    standard_ref: "STD-036"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/desk-card/desk-card.vue"
+      - "src/components/booking/reservation-card/reservation-card.vue"
   - id: "INT-018"
     checkpoint: 4
     type: "investigation"

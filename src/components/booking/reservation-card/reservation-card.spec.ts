@@ -24,10 +24,13 @@ const baseProps = {
 }
 
 describe('ReservationCard', () => {
-  it('renders the reservation details and check-in badge', () => {
+  it('renders the reservation identity, zone, floor, date and granularity as distinct fields', () => {
     const wrapper = mount(ReservationCard, { props: baseProps })
     expect(wrapper.get('.reservation-card__label').text()).toBe('desk-2b-014')
-    expect(wrapper.get('.reservation-card__when').text()).toBe('2026-07-27 · Full day')
+    expect(wrapper.get('.reservation-card__zone').text()).toBe('zone-2b')
+    expect(wrapper.get('.reservation-card__floor').text()).toBe('2')
+    expect(wrapper.get('.reservation-card__date').text()).toBe('2026-07-27')
+    expect(wrapper.get('.reservation-card__granularity').text()).toBe('Full day')
     expect(wrapper.get('.status-badge').text()).toBe('Not checked in')
   })
 

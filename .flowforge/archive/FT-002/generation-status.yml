@@ -4,4 +4,4 @@ current_checkpoint: 5
 strategy: incremental
 started_at: '2026-07-25T16:20:00Z'
 updated_at: '2026-07-25T19:12:30Z'
-message: All checkpoints passed. AI Step Summary generated.
+message: All checkpoints passed. AI Step Summary generated. Delta re-gen 2026-07-26 (hub a715a31, ADR-0094 field split) — CP4 cards split, 316/316.

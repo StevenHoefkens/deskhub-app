@@ -9,6 +9,12 @@
 > scenarios and no owned contracts**; frontend code-to-contract conformance is compile-time `tsc` against
 > types generated from the contract snapshot (STD-037 rule 16 = STD-024).
 
+> **Delta re-generation (2026-07-26, hub `a715a31`).** After the upstream contract fix (STD-041 endpoint
+> security + `servers:`) and the ADR-0094 rendered-binding screen split, this slice was re-generated. CP1–CP3
+> are unchanged (the added `security`/`servers` do not alter generated types — regenerated types are byte-identical).
+> CP4 changed only the two card components, splitting composite display fields to one element per response
+> property (INT-019). Full regression 316/316 after the rework.
+
 ## Section 1: Traceability Matrix
 
 There are **no owned Gherkin scenarios** in this slice, so the scenario matrix is vacuously satisfied
@@ -19,11 +25,11 @@ passing test.
 | Screen · Section (UC) | Component / Handler | Test File(s) | Status |
 |---|---|---|---|
 | SCR-002 · desk-search (UC-005) | desk-search-form.vue, tag-filter-input.vue, form-field.vue; desk-finder.vue (state+validation) | desk-search-form.spec.ts, tag-filter-input.spec.ts, form-field.spec.ts, desk-finder.spec.ts | pass |
-| SCR-002 · desk-results (UC-005) | desk-card.vue; desk-finder.vue (no-access / empty / list) | desk-card.spec.ts, desk-finder.spec.ts | pass |
+| SCR-002 · desk-results (UC-005) — DeskRow: DeskLabel, DeskZone, DeskFloor, DeskTags (ADR-0094 split) | desk-card.vue (one element per field); desk-finder.vue (no-access / empty / list) | desk-card.spec.ts, desk-finder.spec.ts | pass |
 | SCR-002 · reserve-desk (UC-004) | desk-card.vue (ReserveStatus "Reserving…"); desk-finder.vue (onReserve); use-reserve-desk.ts | desk-card.spec.ts, desk-finder.spec.ts, use-reserve-desk.spec.ts | pass |
 | SCR-002 · orchestration search on_success→refresh / on_error→toast | desk-finder.vue (submittedParams; date-gated toast) | desk-finder.spec.ts | pass |
 | SCR-002 · orchestration reserve on_success→refresh+toast / on_error→refresh+toast | desk-finder.vue (invalidate via composable; search.refetch on error) | desk-finder.spec.ts, use-reserve-desk.spec.ts | pass |
-| SCR-003 · reservations-list (UC-006) | reservation-card.vue, status-badge.vue; reservation-list.vue; my-reservations-view.vue (title) | reservation-card.spec.ts, status-badge.spec.ts, reservation-list.spec.ts, my-reservations-view.spec.ts | pass |
+| SCR-003 · reservations-list (UC-006) — ReservationRow: DeskLabel, ReservationZone, ReservationFloor, ReservationDate, ReservationGranularity, CheckInBadge (ADR-0094 split) | reservation-card.vue (one element per field), status-badge.vue; reservation-list.vue; my-reservations-view.vue (title) | reservation-card.spec.ts, status-badge.spec.ts, reservation-list.spec.ts, my-reservations-view.spec.ts | pass |
 | SCR-003 · cancel-reservation (UC-007) | confirm-dialog.vue (requiresConfirm + "Cancelling…" pending); reservation-list.vue (confirmCancel); use-cancel-reservation.ts | confirm-dialog.spec.ts, reservation-list.spec.ts, use-cancel-reservation.spec.ts | pass |
 | SCR-003 · orchestration cancel on_success→refresh+toast / on_error→refresh+toast | reservation-list.vue (invalidate via composable; query.refetch on error) | reservation-list.spec.ts | pass |
 | Routing /desks, /reservations | router/index.ts | router.spec.ts | pass |
@@ -58,11 +64,12 @@ no runtime conformance tests to list; consumer conformance is enforced at compil
 | INT-012 | Booking copy localized en+nl; Dutch derived | low | Match FT-001 i18n convention; English from screens | No |
 | INT-013 | GranularitySelect = native <select>, not ARIA combobox | low | SCR-002 fixed-enum inline options, ADR-0090 (not a dynamic picker) | No |
 | INT-014 | Search on_error toast gated to date-field errors | low | Screen toast copy is date-specific; other fields inline-only | No |
-| INT-016 | Inline search-error notice added beyond screen tree | low | STD-040 r6 async error state; screen models only a toast | **Yes** |
+| INT-016 | Inline search-error notice added beyond screen tree | low | STD-040 r6 async error state; error-body binding is not traversed by ADR-0094 rendered-binding (FT-001 precedent) — sanctioned, no longer a gap | No |
+| INT-019 | ADR-0094 split composite display fields into one node per property (delta re-gen) | low | Rendered-binding requires each display field to name a single success-schema property; components mirror the split screens 1:1 | No |
 | INT-017 | Web-Vitals synthetic checks treated as CI/infra, not generated code | low | Bundle budget enforced (55 KB<200 KB); Lighthouse CI is infra | No |
 | — | INT-004, INT-007, INT-008, INT-011, INT-015 | low | contract regeneration over hand-fix; real-date validation; config-key display maps; vue-query dep; title placement | No |
 
-**Spec gaps to feed back to Phase 2:** INT-005 (30-day inclusive boundary — confirm off-by-one against deskhub-api), INT-016 (add the inline search-error notice to SCR-002 so code and screen stay in lockstep).
+**Spec gaps to feed back to Phase 2:** INT-005 (30-day inclusive boundary — confirm off-by-one against deskhub-api). INT-016 resolved by ADR-0094 (error-body binding is sanctioned, not traversed by the rendered-binding check).
 
 ## Section 3: Standards Compliance Report
 
@@ -93,10 +100,10 @@ final standards-lens review). The single deviation (STD-037 r2) is justified and
 | Owned screens realized | 2 / 2 (SCR-002, SCR-003) |
 | Screen sections + orchestration edges mapped & tested | 10 / 10 |
 | Consumed contract operations (compile-time conformance) | 4 / 4 |
-| Total interpretations | 18 |
+| Total interpretations | 19 |
 | High-risk interpretations | 0 |
 | Medium-risk interpretations | 4 (INT-001, INT-005, INT-009, INT-018) |
-| Spec gaps for Phase 2 | 2 (INT-005, INT-016) |
+| Spec gaps for Phase 2 | 1 (INT-005) |
 | Self-corrections (review + TDD) | 9 |
 | Total tests | 316 passing |
 | Production JS bundle | 55.3 KB gzipped (budget 200 KB) |

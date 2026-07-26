@@ -48,6 +48,9 @@ final_review_findings:
   important: 3
   minor: 2
   resolution: "FIXED: cancel on_error now refetches the reservations list (reservation-list.vue) matching SCR-003 orchestration; 'Cancelling…' pending node realized via ConfirmDialog pendingLabel (consumes booking.cancel.pending); added cancel-failure test and extended reserve-refused test to assert list refetch; confirm-dialog pending-label test added. Minor (inline search-error notice not modeled in SCR-002; API message passthrough into notices) logged as spec gaps for Phase 2 — text-escaped, non-blocking."
+revisions:
+  - date: '2026-07-26'
+    reason: "Delta re-generation against refreshed screens (hub a715a31, ADR-0094 rendered-binding). SCR-002 DeskRow and SCR-003 ReservationRow split composite display fields into one node per response property. desk-card split zoneId/floor into distinct elements; reservation-card split zoneId/floor/date/granularity into four distinct elements. Co-located tests updated (TDD RED->GREEN). CP1-CP3 unaffected (servers/security added upstream do not change generated types). Full regression 316/316; build 55.3 KB."
 tdd_compliance: true
 verification_evidence:
   command: "npm test && npm run lint && npm run type-check"

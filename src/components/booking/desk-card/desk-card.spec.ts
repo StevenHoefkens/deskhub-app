@@ -18,10 +18,11 @@ const baseProps = {
 }
 
 describe('DeskCard', () => {
-  it('renders the desk identity, location and tags', () => {
+  it('renders the desk identity, zone, floor and tags as distinct fields', () => {
     const wrapper = mount(DeskCard, { props: baseProps })
     expect(wrapper.get('.desk-card__label').text()).toBe('desk-2b-014')
-    expect(wrapper.get('.desk-card__location').text()).toBe('zone-2b · 2')
+    expect(wrapper.get('.desk-card__zone').text()).toBe('zone-2b')
+    expect(wrapper.get('.desk-card__floor').text()).toBe('2')
     expect(wrapper.get('.desk-card__tags').text()).toBe('standing, dual-monitor')
   })
 

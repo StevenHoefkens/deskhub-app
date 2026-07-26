@@ -34,7 +34,7 @@ specs:
       constraints.md: specs/reservation/UC-005-search-available-desks/constraints.md
     service: deskhub-api
     domain: reservation
-    spec_hash: 4f8872bac25dc8cfa89819a26529feb121ba0088a807796f3ad12ec46f54fdee
+    spec_hash: 54789605f026d4898a84c0455a31ec308897104db392b961d47c0858b2b76d06
   - id: UC-004
     kind: upstream_dependency
     action: create
@@ -48,7 +48,7 @@ specs:
       decisions.md: specs/reservation/UC-004-reserve-a-desk/decisions.md
     service: deskhub-api
     domain: reservation
-    spec_hash: 55aec2dca6e2b86d6192e713a19e7613a6d4e9ab589b9e8e878d0e1d3b6d2dea
+    spec_hash: 5b941fa0ed7064218a227179d670d8aeb876e9d4f14f4c809b080919a1506201
   - id: UC-006
     kind: upstream_dependency
     action: create
@@ -61,7 +61,7 @@ specs:
       constraints.md: specs/reservation/UC-006-list-my-reservations/constraints.md
     service: deskhub-api
     domain: reservation
-    spec_hash: 87d56af40316a1430faeb055bfd568bf34166a1d5e5b5b002e0a5e2b84097315
+    spec_hash: c03343e624dff895b04c7b4d97382e55917418dbcd7b8d0e6aba8889683be013
   - id: UC-007
     kind: upstream_dependency
     action: create
@@ -74,18 +74,18 @@ specs:
       constraints.md: specs/reservation/UC-007-cancel-reservation/constraints.md
     service: deskhub-api
     domain: reservation
-    spec_hash: 50a815ef6307b71d20d2d57b921783c3a370e461c90a754dd4672f9915464293
+    spec_hash: 2d906cebed789d22de71adcceee14dd6acf241e36ebc9f4a26408d134412d206
 screens:
   - id: SCR-002
     action: create
     path: screens/deskhub-app/booking/SCR-002-find-and-reserve-desk.yml
     app: deskhub-app
-    spec_hash: 7521fc732052aadb9bef13b00dc3b787c267c2d056251797554ef0bdefe8dbb3
+    spec_hash: 497e94c57b9f6238dcc22237cd66d9830d2551dcd56c0a5fe545358b213880d9
   - id: SCR-003
     action: create
     path: screens/deskhub-app/booking/SCR-003-my-reservations.yml
     app: deskhub-app
-    spec_hash: 006050a7efcadd47336c86f4cfff7f7415b87dec34d6e5bf8c0c352abfddc08c
+    spec_hash: e87e1fae5cd044269649a1cf231d99b392453ebc6f158a8198af3ecf6f594d7b
 standards:
   - id: STD-003
     name: Naming Conventions
@@ -166,6 +166,6 @@ dependency_build_order:
         - UC-006
         - UC-007
   critical_path: []
-assembled_at: '2026-07-25T16:15:55.285Z'
-product_hub_commit: b194e928368febb8d75224ea7faae60eb6cddb7d
+assembled_at: '2026-07-26T12:10:11.894Z'
+product_hub_commit: a715a313a14d68c084a5ca2bd05712e867304dc9
 product_hub_remote: git@github.com:StevenHoefkens/deskhub.git
