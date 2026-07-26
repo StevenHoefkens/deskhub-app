@@ -1,0 +1,172 @@
+manifest_schema_version: 2
+service: deskhub-app
+feature:
+  id: FT-005
+  name: Reserve A Room
+  slug: reserve-a-room
+generation_strategy:
+  mode: incremental
+  promotion_tier: new
+  reason: No promotion.yml entries matched the touched pattern_types — defaulting to incremental.
+  checkpoints:
+    - name: Domain Model & Contracts
+      description: Data models, schemas, event definitions, repository interfaces, API/message contracts
+    - name: Domain Logic & Rules
+      description: Domain services, validation rules, business logic, aggregate behavior, state machines
+    - name: Interface Layer
+      description: API endpoints, event handlers, function entry points, middleware
+    - name: Presentation
+      description: UI components, pages, design token application, client-side state
+      optional: true
+    - name: Deployment Topology
+      description: Infrastructure-as-code, CI/CD configuration, deployment manifests
+  max_retries: 2
+specs:
+  - id: UC-006
+    kind: upstream_dependency
+    action: update
+    path: specs/reservation/UC-006-list-my-reservations
+    files:
+      meta.yml: specs/reservation/UC-006-list-my-reservations/meta.yml
+      scenarios.feature: specs/reservation/UC-006-list-my-reservations/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-006-list-my-reservations/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-006-list-my-reservations/flow.mermaid
+      constraints.md: specs/reservation/UC-006-list-my-reservations/constraints.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 48f59cb83dad374377fdcee88a5690b2805b07eb97877321a094eebdf3bacced
+  - id: UC-007
+    kind: upstream_dependency
+    action: update
+    path: specs/reservation/UC-007-cancel-reservation
+    files:
+      meta.yml: specs/reservation/UC-007-cancel-reservation/meta.yml
+      scenarios.feature: specs/reservation/UC-007-cancel-reservation/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-007-cancel-reservation/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-007-cancel-reservation/flow.mermaid
+      constraints.md: specs/reservation/UC-007-cancel-reservation/constraints.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 70256161df120755485ffcd7d6084f060478906f361fba669d737feadb59380d
+  - id: UC-010
+    kind: upstream_dependency
+    action: create
+    path: specs/reservation/UC-010-search-available-rooms
+    files:
+      meta.yml: specs/reservation/UC-010-search-available-rooms/meta.yml
+      scenarios.feature: specs/reservation/UC-010-search-available-rooms/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-010-search-available-rooms/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-010-search-available-rooms/flow.mermaid
+      constraints.md: specs/reservation/UC-010-search-available-rooms/constraints.md
+      decisions.md: specs/reservation/UC-010-search-available-rooms/decisions.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 8a42917ac3962b01a20bc8f6b9a1d728915c08e3c277cc560dfe8067b7bc950c
+  - id: UC-011
+    kind: upstream_dependency
+    action: create
+    path: specs/reservation/UC-011-reserve-a-room
+    files:
+      meta.yml: specs/reservation/UC-011-reserve-a-room/meta.yml
+      scenarios.feature: specs/reservation/UC-011-reserve-a-room/scenarios.feature
+      contract.openapi.yml: specs/reservation/UC-011-reserve-a-room/contract.openapi.yml
+      flow.mermaid: specs/reservation/UC-011-reserve-a-room/flow.mermaid
+      constraints.md: specs/reservation/UC-011-reserve-a-room/constraints.md
+      decisions.md: specs/reservation/UC-011-reserve-a-room/decisions.md
+    service: deskhub-api
+    domain: reservation
+    spec_hash: 81fa7dd26f4780b16f6b623f098074f3635712acf2afd81fa9d711afee7728f0
+screens:
+  - id: SCR-003
+    action: update
+    path: screens/deskhub-app/booking/SCR-003-my-reservations.yml
+    app: deskhub-app
+    spec_hash: e0215ed1f35d7b5ee68a543c20e0611f938d9dd2f8b087d773d7b78771284f39
+  - id: SCR-004
+    action: create
+    path: screens/deskhub-app/booking/SCR-004-find-and-reserve-room.yml
+    app: deskhub-app
+    spec_hash: 4446264e66ff4eaf86620512e9bf4ac2e2ba69d25e13145f62e50dbb31a6c53d
+standards:
+  - id: STD-003
+    name: Naming Conventions
+    category: general
+    path: standards/general/naming-conventions.md
+  - id: STD-005
+    name: Performance Budgets
+    category: nfr
+    path: standards/nfr/performance-budgets.md
+  - id: STD-017
+    name: No Magic Values
+    category: general
+    path: standards/general/STD-017-no-magic-values.md
+  - id: STD-018
+    name: No Unused Dependencies
+    category: general
+    path: standards/general/STD-018-no-unused-dependencies.md
+  - id: STD-019
+    name: Zero Warnings
+    category: general
+    path: standards/general/STD-019-zero-warnings.md
+  - id: STD-020
+    name: Service README
+    category: general
+    path: standards/general/STD-020-service-readme.md
+  - id: STD-032
+    name: Comment Discipline
+    category: general
+    path: standards/general/STD-032-comment-discipline.md
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    category: general
+    path: standards/general/STD-035-scenario-key-binding.md
+  - id: STD-036
+    name: Vue Component Structure
+    category: vue
+    path: standards/vue/STD-036-component-structure.md
+  - id: STD-037
+    name: Vue API Client & Query Composables
+    category: vue
+    path: standards/vue/STD-037-api-client-composables.md
+  - id: STD-038
+    name: Vue Form State & Validation Patterns
+    category: vue
+    path: standards/vue/STD-038-form-patterns.md
+  - id: STD-039
+    name: Vue Component Composition Patterns
+    category: vue
+    path: standards/vue/STD-039-component-patterns.md
+  - id: STD-040
+    name: Vue View & Routing Structure
+    category: vue
+    path: standards/vue/STD-040-view-routing-structure.md
+design_system:
+  app: deskhub-app
+  layers:
+    - design-system/_base/tokens.yml
+    - design-system/deskhub-app/tokens.yml
+  inventory:
+    - design-system/_base/inventory.yml
+    - design-system/deskhub-app/inventory.yml
+code_repos:
+  - service: deskhub-api
+    expected_remote: git@github.com:StevenHoefkens/deskhub-api.git
+  - service: deskhub-app
+    expected_remote: git@github.com:StevenHoefkens/deskhub-app.git
+dependency_build_order:
+  build_order:
+    - UC-006
+    - UC-007
+    - UC-010
+    - UC-011
+  waves:
+    - wave: 1
+      specs:
+        - UC-006
+        - UC-007
+        - UC-010
+        - UC-011
+  critical_path: []
+assembled_at: '2026-07-26T17:04:05.269Z'
+product_hub_commit: a32d0c2739337f21f50c3d4314308853db4c68dc
+product_hub_remote: git@github.com:StevenHoefkens/deskhub.git
