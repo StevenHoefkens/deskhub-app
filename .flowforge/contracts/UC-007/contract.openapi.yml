@@ -1,0 +1,116 @@
+openapi: "3.0.3"
+info:
+  title: "Cancel a reservation"
+  version: "1.0.0"
+
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
+paths:
+  /reservations/{reservationId}/cancel:
+    post:
+      operationId: "cancelReservation"
+      summary: "Cancel the caller's own reservation before its range ends and free the desk"
+      tags:
+        - "reservation"
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          description: "Identifier of the reservation to cancel"
+          schema:
+            type: string
+          example: "res-5501"
+      responses:
+        "200":
+          description: "Reservation cancelled"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelResult"
+        "403":
+          description: "The reservation is not held by the caller"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Reservation not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Reservation cannot be cancelled — its range has already ended, or it is not active"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
+  schemas:
+    # --- Response Schema (the success data body, camelCase, unwrapped) ---
+    CancelResult:
+      type: object
+      required:
+        - id
+        - status
+        - deskId
+        - date
+        - granularity
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "b2c4a1e0-7f3d-4a9b-8c11-0d2e5f6a7b8c"
+        status:
+          type: string
+          description: "Lifecycle status after cancellation"
+          enum:
+            - cancelled
+          example: "cancelled"
+        deskId:
+          type: string
+          description: "The desk freed by the cancellation"
+          example: "desk-2b-014"
+        date:
+          type: string
+          format: date
+          example: "2026-07-27"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
+
+    # --- Shared value: booking granularity ---
+    Granularity:
+      type: string
+      description: "Booking granularity — a full day, or the morning or afternoon half-day"
+      enum:
+        - FULL_DAY
+        - MORNING
+        - AFTERNOON
+      example: "FULL_DAY"
+
+    # --- Error Body Schema (STD-001) ---
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: RESERVATION_NOT_FOUND, NOT_RESERVATION_OWNER, RESERVATION_ALREADY_ENDED, RESERVATION_NOT_ACTIVE."
+          example: "RESERVATION_ALREADY_ENDED"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users"
+          example: "This reservation has already ended and can no longer be cancelled."

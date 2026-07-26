@@ -1,0 +1,75 @@
+checkpoint: 3
+name: "Interface Layer"
+status: passed
+started_at: '2026-07-25T18:42:00Z'
+completed_at: '2026-07-25T18:46:00Z'
+duration_ms: 240000
+attempts: 2
+max_attempts: 3
+test_summary:
+  total: 62
+  passed: 62
+  failed: 0
+  skipped: 0
+  command: "npx vitest run src/api src/composables (full regression: npm test -> 234 passed)"
+files_touched:
+  created:
+    - src/api/client.ts
+    - src/api/booking.ts
+    - src/api/query-keys.ts
+    - src/composables/use-desk-search.ts
+    - src/composables/use-my-reservations.ts
+    - src/composables/use-reserve-desk.ts
+    - src/composables/use-cancel-reservation.ts
+    - src/api/__tests__/client.spec.ts
+    - src/api/__tests__/booking.spec.ts
+    - src/composables/__tests__/query-test-utils.ts
+    - src/composables/__tests__/use-desk-search.spec.ts
+    - src/composables/__tests__/use-my-reservations.spec.ts
+    - src/composables/__tests__/use-reserve-desk.spec.ts
+    - src/composables/__tests__/use-cancel-reservation.spec.ts
+  modified:
+    - src/main.ts
+    - package.json
+    - package-lock.json
+  deleted: []
+reasoning_entries: 3
+tdd_compliance: true
+verification_evidence:
+  command: "npm test && npx depcheck"
+  exit_code: 0
+  summary: "full suite 234/234 pass; CP3 62/62; eslint 0; vue-tsc 0; depcheck 0 unused 0 missing"
+  timestamp: '2026-07-25T18:46:20Z'
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: "verb-first fns (searchAvailableDesks, useReserveDesk); SCREAMING_SNAKE constants; kebab-case files"
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: "API_BASE_URL (env), NO_CONTENT_STATUS, DESKS_QUERY_KEY, RESERVATIONS_QUERY_KEY, DEFAULT_STALE_TIME_MS, fallback message constants"
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: "@tanstack/vue-query added and used by 4 composables; depcheck 0 unused 0 missing"
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: "eslint + vue-tsc exit 0"
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: "no spec/standard citations; no narration in client/services/composables"
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: "no owned Gherkin scenarios (all UCs upstream_dependency) -> CP3 integration tests carry no scenario keys (rule 6)"
+    deviated: false
+  - id: STD-037
+    name: Vue API Client & Query Composables
+    where: "apiClient<T> + ApiClientError (r1,3); per-operation service fns in src/api/booking.ts (r4); mutation composables (use-reserve-desk, use-cancel-reservation) expose mutate/mutateAsync/isPending/isSuccess/data/fieldErrors/reset + extractErrorInfo + invalidateQueries + no toast (r5-9); both query composables (use-desk-search, use-my-reservations) use stable array keys + keepPreviousData + staleTime 30s + get*ErrorMessage (r10-13); request/response typed against generated contract types = compile-time STD-024 conformance (r16). r14 debounce N/A (desk search is button-submit, not typeahead). DEVIATION from r2: no snake_case<->camelCase conversion — contract data payload is camelCase on the wire per ADR-0059 and contracts define bare bodies; apiClient unwraps no envelope. See trace."
+    deviated: true
+  - id: STD-005
+    name: Performance Budgets
+    where: "consulted: both query composables use keepPreviousData to avoid flicker on refetch; search is explicit-submit (no live typing) so 300ms debounce r9 N/A. Bundle/Web-Vitals verified holistically at CP5."
+    deviated: false

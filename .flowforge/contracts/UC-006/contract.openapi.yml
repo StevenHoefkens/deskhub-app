@@ -1,0 +1,122 @@
+openapi: "3.0.3"
+info:
+  title: "List my reservations"
+  version: "1.0.0"
+
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
+paths:
+  /reservations:
+    get:
+      operationId: "listMyReservations"
+      summary: "List the authenticated employee's own active and upcoming desk reservations"
+      tags:
+        - "reservation"
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "The caller's reservations (may be empty)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyReservations"
+        "401":
+          description: "No valid session — the caller is unauthenticated or the session has expired"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
+  schemas:
+    # --- Response Schema (the success data body, camelCase, unwrapped) ---
+    MyReservations:
+      type: object
+      required:
+        - reservations
+      properties:
+        reservations:
+          type: array
+          description: "The caller's active and upcoming desk reservations; empty when none"
+          items:
+            $ref: "#/components/schemas/ReservationSummary"
+
+    ReservationSummary:
+      type: object
+      required:
+        - id
+        - deskId
+        - zoneId
+        - floor
+        - date
+        - granularity
+        - status
+        - checkInState
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "b2c4a1e0-7f3d-4a9b-8c11-0d2e5f6a7b8c"
+        deskId:
+          type: string
+          example: "desk-2b-014"
+        zoneId:
+          type: string
+          example: "zone-2b"
+        floor:
+          type: string
+          description: "Floor label (may be negative, e.g. -1)"
+          example: "2"
+        date:
+          type: string
+          format: date
+          example: "2026-07-27"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
+        status:
+          type: string
+          enum:
+            - active
+            - cancelled
+            - no_show
+          example: "active"
+        checkInState:
+          type: string
+          enum:
+            - not_checked_in
+            - checked_in
+          example: "not_checked_in"
+
+    Granularity:
+      type: string
+      description: "Booking granularity — a full day, or the morning or afternoon half-day"
+      enum:
+        - FULL_DAY
+        - MORNING
+        - AFTERNOON
+      example: "FULL_DAY"
+
+    # --- Error Body Schema (STD-001) ---
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: SESSION_EXPIRED."
+          example: "SESSION_EXPIRED"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users"
+          example: "Your session has expired. Please sign in again."

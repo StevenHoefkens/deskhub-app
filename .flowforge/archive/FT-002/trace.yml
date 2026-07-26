@@ -1,0 +1,239 @@
+format_version: "1.0"
+feature: "FT-002"
+agent_runtime: "claude-code"
+model: "claude-opus-4-8"
+generated_at: "2026-07-25T19:10:00Z"
+entries:
+  - id: "INT-001"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "No owned use-case specs in this slice"
+    decision: "Treat all four UCs as upstream_dependency (consumed, not implemented). Frontend code-to-contract conformance is compile-time tsc against generated contract types, not runtime conformance tests."
+    reasoning: "Manifest marks UC-004/005/006/007 kind: upstream_dependency (owned by deskhub-api). STD-037 rule 16 defines the frontend's STD-024 conformance as the typed apiClient + generated types checked by tsc; the producer owns runtime validation."
+    risk: "medium"
+    spec_ref: "manifest specs[]; UC-004..007 meta.yml"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/types/booking.ts"
+      - "src/types/contracts/"
+  - id: "INT-002"
+    checkpoint: 1
+    type: "assumption"
+    subject: "Canonical API error body type"
+    decision: "Alias ApiErrorBody to UC-004's Error schema (the structural superset carrying optional details[]), reused for all four contracts."
+    reasoning: "UC-004/005 Error carries details[]; UC-006/007 omit it. UC-004's optional-details shape safely models all four; avoids four divergent error types."
+    risk: "low"
+    spec_ref: "UC-004..007 contract.openapi.yml Error schema"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/types/errors.ts"
+  - id: "INT-003"
+    checkpoint: 1
+    type: "interpretation"
+    subject: "FieldError vs wire error detail"
+    decision: "Keep FieldError { field, reason } as the standard-mandated normalized view model; add a separate contract-bound ApiErrorDetail = NonNullable<ApiErrorBody['details']>[number] for the wire shape."
+    reasoning: "STD-037 rule 7 and STD-038 rules 4/7 prescribe FieldError { field, reason } verbatim as the app's field-error view model. Binding the wire detail separately keeps the CP3 details->FieldError mapping contract-anchored (resolves CP1 review Important finding)."
+    risk: "low"
+    spec_ref: "UC-004 Error.details[]"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/types/errors.ts"
+  - id: "INT-004"
+    checkpoint: 1
+    type: "deviation"
+    subject: "Regeneration overwrites a prior hand-fix of uc-001.ts"
+    decision: "Regenerate all contract types from the materialized snapshot; do not preserve the earlier hand-edit of src/types/contracts/uc-001.ts."
+    reasoning: "Generated code must never be hand-patched (ADR-0002/0017). The snapshot is the source of truth; the prior hand-fix caused spec_hash drift and is correctly discarded."
+    risk: "low"
+    spec_ref: ".flowforge/contracts/UC-001"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/types/contracts/uc-001.ts"
+  - id: "INT-005"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "30-day booking horizon boundary"
+    decision: "Implement the client window as today..today+30 calendar days inclusive (31 distinct days)."
+    reasoning: "Upstream constraints say 'today or later and within the rolling 30-day horizon'; SCR-002 copy says 'next 30 days'. Inclusive upper bound chosen; the exact off-by-one is owned by deskhub-api. Degrades gracefully (server 400 -> existing toast) if the server uses today+29."
+    risk: "medium"
+    spec_ref: "UC-004 constraints.md Validation; SCR-002 desk-search on_error"
+    standard_ref: null
+    spec_gap: true
+    files_affected:
+      - "src/lib/booking/booking-window.ts"
+  - id: "INT-006"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Validation message language"
+    decision: "Client validation returns user-facing English strings in FieldError.reason (not i18n keys)."
+    reasoning: "STD-038 rule 6 mandates user-facing messages, not codes; its examples use plain strings. DATE_OUT_OF_WINDOW is taken verbatim from the SCR-002 screen copy. Static UI copy is i18n'd separately (CP4)."
+    risk: "low"
+    spec_ref: "SCR-002 desk-search on_error message"
+    standard_ref: "STD-038"
+    spec_gap: false
+    files_affected:
+      - "src/validation/reservation.ts"
+  - id: "INT-007"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Real-calendar-date validation"
+    decision: "Add isRealCalendarDate (round-trip through Date) so well-shaped-but-impossible dates (2026-02-30) report DATE_INVALID rather than DATE_OUT_OF_WINDOW."
+    reasoning: "CP2 review Minor: shape-only regex let impossible dates fall through to the window message. Round-trip validation routes them to the correct message."
+    risk: "low"
+    spec_ref: "UC-004/005 date format"
+    standard_ref: "STD-038"
+    spec_gap: false
+    files_affected:
+      - "src/lib/booking/booking-window.ts"
+      - "src/validation/reservation.ts"
+  - id: "INT-008"
+    checkpoint: 2
+    type: "interpretation"
+    subject: "Config-driven display maps hold i18n keys"
+    decision: "checkInBadge/granularityLabelKey return i18n label KEYS + badge variant; copy is resolved by feature components at CP4."
+    reasoning: "STD-039 rule 19 config-driven display + the app i18n convention: keep the enum->config mapping in domain logic (CP2), resolve copy in the presentation layer (CP4)."
+    risk: "low"
+    spec_ref: "SCR-003 CheckInBadge; SCR-002 GranularitySelect"
+    standard_ref: "STD-039"
+    spec_gap: false
+    files_affected:
+      - "src/lib/booking/reservation-display.ts"
+  - id: "INT-009"
+    checkpoint: 3
+    type: "deviation"
+    subject: "No snake_case<->camelCase conversion in apiClient"
+    decision: "apiClient performs no case conversion and unwraps no envelope; it returns response.json() as T and throws ApiClientError(status, body) on non-2xx."
+    reasoning: "STD-037 rule 2 assumes a snake_case backend. Per ADR-0059 (referenced by STD-037) the contract data payload is camelCase on the wire, and the contracts define bare response bodies (no {data,error,meta} wrapper). Conversion would corrupt already-camelCase payloads. Justified deviation."
+    risk: "medium"
+    spec_ref: "UC-004..007 contract.openapi.yml"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/api/client.ts"
+  - id: "INT-010"
+    checkpoint: 3
+    type: "interpretation"
+    subject: "Field-error extraction shape"
+    decision: "extractErrorInfo maps contract Error.details[] {field,rule,message} to FieldError {field, reason: message}."
+    reasoning: "STD-037 rule 7's example assumed error.data.errors (a map); the consumed contract uses a details[] array. Mapping to the human message keeps reasons user-facing."
+    risk: "low"
+    spec_ref: "UC-004 Error.details[]"
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "src/composables/use-reserve-desk.ts"
+  - id: "INT-011"
+    checkpoint: 3
+    type: "assumption"
+    subject: "Data-fetching dependency"
+    decision: "Add @tanstack/vue-query as the query/mutation library."
+    reasoning: "STD-037 mandates TanStack Query composables. The package is actually used by all four composables, so STD-018 is satisfied by construction."
+    risk: "low"
+    spec_ref: null
+    standard_ref: "STD-037"
+    spec_gap: false
+    files_affected:
+      - "package.json"
+      - "src/composables/"
+  - id: "INT-012"
+    checkpoint: 4
+    type: "assumption"
+    subject: "Dutch localization of screen copy"
+    decision: "Localize all booking copy in en + nl; derive the Dutch strings (screens specify English only)."
+    reasoning: "FT-001 established an i18n convention (locale toggle + MESSAGES). A hardcoded-English page would be inconsistent and unaffected by the toggle. English strings come from the screens; Dutch is derived."
+    risk: "low"
+    spec_ref: "SCR-002, SCR-003 copy"
+    standard_ref: null
+    spec_gap: false
+    files_affected:
+      - "src/lib/i18n/messages.ts"
+  - id: "INT-013"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "GranularitySelect realization"
+    decision: "Realize the fixed-enum GranularitySelect as a native <select>, not the full ARIA combobox pattern (STD-039 r16-17)."
+    reasoning: "SCR-002 annotates GranularitySelect with inline fixed options and 'not a dynamic picker (ADR-0090)'. A native select is accessible by default; the ARIA combobox pattern targets typeahead pickers."
+    risk: "low"
+    spec_ref: "SCR-002 GranularitySelect (ADR-0090)"
+    standard_ref: "STD-039"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/desk-search-form/desk-search-form.vue"
+  - id: "INT-014"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Search error toast gating"
+    decision: "Raise the SCR-002 desk-search on_error toast ('...within the next 30 days.') only when client validation produces a date-field error; other field errors show inline only."
+    reasoning: "The screen's on_error toast copy is date-specific. Firing it for a granularity-only error would be misleading; inline FormField errors (STD-038) cover all fields."
+    risk: "low"
+    spec_ref: "SCR-002 desk-search on_error"
+    standard_ref: "STD-038"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/desk-finder/desk-finder.vue"
+  - id: "INT-015"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Page title placement"
+    decision: "SCR-002's SearchTitle stays inside the DeskSearchForm feature; SCR-003's ListTitle is rendered in the view header (my-reservations-view)."
+    reasoning: "SCR-002 models its title inside the desk-search section; SCR-003 models a list title. STD-040 puts the resource title in the list view's page header."
+    risk: "low"
+    spec_ref: "SCR-002 SearchTitle; SCR-003 ListTitle"
+    standard_ref: "STD-040"
+    spec_gap: false
+    files_affected:
+      - "src/views/booking/my-reservations-view.vue"
+  - id: "INT-016"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "Inline search-error notice beyond the screen tree"
+    decision: "Render an inline error notice in the results region when the search query itself errors (server 400), in addition to the screen's toast."
+    reasoning: "STD-040 rule 6 requires async content to show an error state. SCR-002 models search failure only as a toast; the inline notice is defensive reconciliation. Recommend recording it in the screen upstream (ADR-0002)."
+    risk: "low"
+    spec_ref: "SCR-002 desk-results"
+    standard_ref: "STD-040"
+    spec_gap: true
+    files_affected:
+      - "src/components/booking/desk-finder/desk-finder.vue"
+  - id: "INT-017"
+    checkpoint: 5
+    type: "interpretation"
+    subject: "Web-Vitals enforcement scope"
+    decision: "Enforce the JS bundle budget (postbuild) as generated output; treat STD-005 rule 15 Web-Vitals synthetic checks (LCP/INP/CLS) as a CI/infra concern not configured in this repo at P1."
+    reasoning: "The bundle budget is code-enforceable and passes (55 KB < 200 KB). Lighthouse/Web-Vitals CI is infrastructure, not feature-generated code; flagged as advisory."
+    risk: "low"
+    spec_ref: null
+    standard_ref: "STD-005"
+    spec_gap: false
+    files_affected:
+      - "README.md"
+  - id: "INT-019"
+    checkpoint: 4
+    type: "interpretation"
+    subject: "ADR-0094 rendered-binding: split composite display fields"
+    decision: "On delta re-generation against refreshed screens (hub a715a31), split the card display fields to one element per response property: desk-card -> zoneId + floor; reservation-card -> zoneId + floor + date + granularity. Removed the combined 'zoneId · floor' / 'date · granularity' renders."
+    reasoning: "ADR-0094 rendered-binding requires each screen display field to name a single real property of the UC success response schema; the hub split SCR-002 DeskRow and SCR-003 ReservationRow accordingly. Components mirror the split for 1:1 code<->screen traceability. Error-body binding (search/list error notices) is explicitly not traversed by the check (FT-001 precedent), so INT-016's inline notice remains valid and is no longer a spec gap."
+    risk: "low"
+    spec_ref: "SCR-002 desk-results DeskRow; SCR-003 reservations-list ReservationRow"
+    standard_ref: "STD-036"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/desk-card/desk-card.vue"
+      - "src/components/booking/reservation-card/reservation-card.vue"
+  - id: "INT-018"
+    checkpoint: 4
+    type: "investigation"
+    subject: "Cancel error path did not refresh the list (final-review Critical)"
+    decision: "Add await query.refetch() to the cancel error branch and realize the 'Cancelling…' pending node via ConfirmDialog pendingLabel; add error-path tests."
+    reasoning: "Final traceability review found SCR-003 cancel on_error -> refresh reservations-list was unrealized (the reserve error branch had it, the cancel branch did not) and untested. Root cause: no cancel-failure test. Fixed and covered."
+    risk: "medium"
+    spec_ref: "SCR-003 cancel-reservation on_error"
+    standard_ref: "STD-040"
+    spec_gap: false
+    files_affected:
+      - "src/components/booking/reservation-list/reservation-list.vue"
+      - "src/components/shared/ui/confirm-dialog/confirm-dialog.vue"

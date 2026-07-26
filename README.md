@@ -37,6 +37,7 @@ convention). Only variables prefixed `VITE_` are exposed to client code.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `VITE_SSO_LOGIN_PATH` | No | `/auth/sso/login` | Backend path the "Sign in with SSO" button redirects to. The recorded return URL is appended as a `returnUrl` query parameter. |
+| `VITE_API_BASE_URL` | No | `/api` | Base URL the booking API client (`src/api/client.ts`) prefixes onto every request (desk search, reserve, list, cancel). Point it at the `deskhub-api` origin when not served behind the same host. |
 
 ## Running Tests
 

@@ -1,0 +1,104 @@
+checkpoint: 4
+name: "Presentation"
+status: passed
+started_at: '2026-07-25T18:52:00Z'
+completed_at: '2026-07-25T19:01:00Z'
+duration_ms: 540000
+attempts: 2
+max_attempts: 3
+test_summary:
+  total: 52
+  passed: 52
+  failed: 0
+  skipped: 0
+  command: "npx vitest run src/components/booking src/views/booking src/router src/lib/i18n (full regression: npm test -> 312 passed)"
+files_touched:
+  created:
+    - src/components/shared/ui/form-field/form-field.vue
+    - src/components/shared/ui/form-field/form-field.spec.ts
+    - src/components/shared/ui/status-badge/status-badge.vue
+    - src/components/shared/ui/status-badge/status-badge.spec.ts
+    - src/components/shared/ui/confirm-dialog/confirm-dialog.vue
+    - src/components/shared/ui/confirm-dialog/confirm-dialog.spec.ts
+    - src/components/booking/tag-filter-input/tag-filter-input.vue
+    - src/components/booking/tag-filter-input/tag-filter-input.spec.ts
+    - src/components/booking/desk-search-form/desk-search-form.vue
+    - src/components/booking/desk-search-form/desk-search-form.spec.ts
+    - src/components/booking/desk-card/desk-card.vue
+    - src/components/booking/desk-card/desk-card.spec.ts
+    - src/components/booking/reservation-card/reservation-card.vue
+    - src/components/booking/reservation-card/reservation-card.spec.ts
+    - src/components/booking/desk-finder/desk-finder.vue
+    - src/components/booking/desk-finder/desk-finder.spec.ts
+    - src/components/booking/reservation-list/reservation-list.vue
+    - src/components/booking/reservation-list/reservation-list.spec.ts
+    - src/views/booking/find-desk-view.vue
+    - src/views/booking/my-reservations-view.vue
+    - src/views/booking/__tests__/find-desk-view.spec.ts
+    - src/views/booking/__tests__/my-reservations-view.spec.ts
+  modified:
+    - src/lib/i18n/messages.ts
+    - src/router/index.ts
+    - src/router/__tests__/router.spec.ts
+    - src/assets/tokens.css
+  deleted: []
+reasoning_entries: 5
+final_review_findings:
+  critical: 1
+  important: 3
+  minor: 2
+  resolution: "FIXED: cancel on_error now refetches the reservations list (reservation-list.vue) matching SCR-003 orchestration; 'Cancelling…' pending node realized via ConfirmDialog pendingLabel (consumes booking.cancel.pending); added cancel-failure test and extended reserve-refused test to assert list refetch; confirm-dialog pending-label test added. Minor (inline search-error notice not modeled in SCR-002; API message passthrough into notices) logged as spec gaps for Phase 2 — text-escaped, non-blocking."
+revisions:
+  - date: '2026-07-26'
+    reason: "Delta re-generation against refreshed screens (hub a715a31, ADR-0094 rendered-binding). SCR-002 DeskRow and SCR-003 ReservationRow split composite display fields into one node per response property. desk-card split zoneId/floor into distinct elements; reservation-card split zoneId/floor/date/granularity into four distinct elements. Co-located tests updated (TDD RED->GREEN). CP1-CP3 unaffected (servers/security added upstream do not change generated types). Full regression 316/316; build 55.3 KB."
+tdd_compliance: true
+verification_evidence:
+  command: "npm test && npm run lint && npm run type-check"
+  exit_code: 0
+  summary: "full suite 312/312 pass; CP4 52/52; eslint 0; vue-tsc 0; tokens recompiled + imported via main.css"
+  timestamp: '2026-07-25T19:01:30Z'
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: "PascalCase multi-word components (DeskSearchForm, ReservationCard); kebab-case dirs/files; SCREAMING_SNAKE field-id/route constants"
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: "DATE/WHEN/TAGS_FIELD_ID constants; FIND_DESK/MY_RESERVATIONS_ROUTE_PATH constants; all copy via i18n keys"
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: "no new deps at CP4; components consume existing vue/vue-query/toast"
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: "eslint + vue-tsc exit 0"
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: "no spec-mapping comment blocks in views/features (STD-039 r11 / STD-040 r2); screen token-binding notes not copied into code"
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: "no owned Gherkin scenarios -> component tests carry no scenario keys (rule 6)"
+    deviated: false
+  - id: STD-036
+    name: Vue Component Structure
+    where: "domain dirs (components/booking, shared/ui); tiers: ui (form-field, status-badge, confirm-dialog, tag-filter-input, desk-search-form, desk-card, reservation-card) vs feature (desk-finder, reservation-list) vs view; list items extracted as ui (r9); typed defineProps/defineEmits (r8); tokens via var(--token) only (r7); co-located tests (r2)"
+    deviated: false
+  - id: STD-038
+    name: Vue Form State & Validation Patterns
+    where: "desk-finder: reactive values + errors, per-field update clears error (r3), submit flow validate->inline errors->mutateAsync->toast (r9); FormField wrapper role=alert aria-live + aria-invalid/describedby (r12-13); confirm dialog BEFORE cancel api call (r10); reset via composable"
+    deviated: false
+  - id: STD-039
+    name: Vue Component Composition Patterns
+    where: "typed props/emits + withDefaults variants (r1-2); ConfirmDialog role=dialog/aria-modal/labelledby, esc+backdrop close w/ isPending guard, focus confirm on open + restore, mobile full-screen (r12-15); StatusBadge config-driven via checkInBadge (r19); toasts raised in feature components only, never ui/composables (r18); GranularitySelect realized as native <select> (fixed-enum, ADR-0090) not ARIA combobox"
+    deviated: false
+  - id: STD-040
+    name: Vue View & Routing Structure
+    where: "lazy-loaded views (r1); thin views delegate to features, no fetching in views (r7); list view carries resource title; responsive padding + mobile dialog (r14-17)"
+    deviated: false
+  - id: STD-005
+    name: Performance Budgets
+    where: "consulted: pending states give <100ms interaction feedback (r7); result/reservation lists small (virtualization r8 threshold 50 not reached); bundle budget verified at CP5"
+    deviated: false

@@ -1,0 +1,201 @@
+openapi: "3.0.3"
+info:
+  title: "Reserve a desk"
+  version: "1.0.0"
+
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
+paths:
+  /reservations:
+    post:
+      operationId: "reserveDesk"
+      summary: "Reserve an available desk for a date and granularity"
+      tags:
+        - "reservation"
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReserveDeskRequest"
+      responses:
+        "201":
+          description: "Reservation created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: "Validation error — date in the past or beyond the rolling 30-day horizon"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "The desk's zone is not in the employee's effective bookable-zone set"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Desk not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Desk not available, or the employee already holds an overlapping reservation, or the desk was just taken under contention"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
+  schemas:
+    # --- Request Schema (camelCase, unwrapped) ---
+    ReserveDeskRequest:
+      type: object
+      required:
+        - deskId
+        - date
+        - granularity
+      properties:
+        deskId:
+          type: string
+          description: "Identifier of the desk to reserve"
+          example: "desk-2b-014"
+        date:
+          type: string
+          format: date
+          description: "Reservation date; must be today or later and within the rolling 30-day horizon"
+          example: "2026-07-27"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
+
+    # --- Response Schema (the created Reservation, camelCase, unwrapped) ---
+    Reservation:
+      type: object
+      required:
+        - id
+        - deskId
+        - zoneId
+        - floor
+        - date
+        - granularity
+        - startsAt
+        - endsAt
+        - bookerId
+        - occupantId
+        - status
+        - checkInState
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Unique reservation identifier"
+          example: "b2c4a1e0-7f3d-4a9b-8c11-0d2e5f6a7b8c"
+        deskId:
+          type: string
+          example: "desk-2b-014"
+        zoneId:
+          type: string
+          description: "Zone the desk belongs to"
+          example: "zone-2b"
+        floor:
+          type: string
+          description: "Floor label of the desk (may be negative, e.g. -1)"
+          example: "2"
+        date:
+          type: string
+          format: date
+          example: "2026-07-27"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
+        startsAt:
+          type: string
+          format: date-time
+          description: "Reservation start, derived from the shared clock boundaries for the granularity"
+          example: "2026-07-27T09:00:00+02:00"
+        endsAt:
+          type: string
+          format: date-time
+          description: "Reservation end, derived from the shared clock boundaries for the granularity"
+          example: "2026-07-27T18:00:00+02:00"
+        bookerId:
+          type: string
+          description: "The user who made the reservation"
+          example: "user-2231"
+        occupantId:
+          type: string
+          description: "The user who will occupy the desk; equal to bookerId in MVP (self-only)"
+          example: "user-2231"
+        status:
+          type: string
+          description: "Reservation lifecycle status"
+          enum:
+            - active
+            - cancelled
+            - no_show
+          example: "active"
+        checkInState:
+          type: string
+          description: "Check-in flag on an active reservation; a new reservation is created not-checked-in"
+          enum:
+            - not_checked_in
+            - checked_in
+          example: "not_checked_in"
+
+    # --- Shared value: booking granularity ---
+    Granularity:
+      type: string
+      description: "Booking granularity — a full day, or the morning or afternoon half-day"
+      enum:
+        - FULL_DAY
+        - MORNING
+        - AFTERNOON
+      example: "FULL_DAY"
+
+    # --- Error Body Schema (STD-001) ---
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: INVALID_DATE, ZONE_NOT_ACCESSIBLE, DESK_NOT_FOUND, DESK_NOT_AVAILABLE, OVERLAPPING_RESERVATION."
+          example: "DESK_NOT_AVAILABLE"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users"
+          example: "This desk is no longer available for the selected time."
+        details:
+          type: array
+          description: "Field-level validation errors (HTTP 400 — STD-001 Rule 8)"
+          items:
+            type: object
+            required:
+              - field
+              - rule
+              - message
+            properties:
+              field:
+                type: string
+                example: "date"
+              rule:
+                type: string
+                example: "horizon"
+              message:
+                type: string
+                example: "Date must be within the next 30 days."
