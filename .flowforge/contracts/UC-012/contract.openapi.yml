@@ -1,0 +1,151 @@
+openapi: "3.0.3"
+info:
+  title: "Check in to a desk reservation"
+  version: "1.0.0"
+
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
+paths:
+  /reservations/{reservationId}/check-in:
+    post:
+      operationId: "checkInToReservation"
+      summary: "Check in to the caller's own desk reservation within its check-in window, confirming occupancy"
+      tags:
+        - "reservation"
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          description: "Identifier of the desk reservation to check in to"
+          schema:
+            type: string
+          example: "res-5501"
+      responses:
+        "200":
+          description: "Checked in. Also returned for an idempotent re-check-in of an already-checked-in reservation (alreadyCheckedIn is true)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckInResult"
+        "401":
+          description: "No valid session — the caller is unauthenticated (UNAUTHENTICATED) or the session has expired (SESSION_EXPIRED)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "The reservation is not held by the caller"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Reservation not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Check-in conflicts with the reservation's current state — it is in a terminal state (cancelled or no-show), or its time range has already ended"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: "Check-in violates a business rule — the reservation is a room booking (check-in is desks only), or the current time is outside the check-in window (not yet open, or expired as a no-show)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
+  schemas:
+    # --- Response Schema (the success data body, camelCase, unwrapped) ---
+    # Result of checking in to a desk reservation. On a fresh check-in
+    # checkInState becomes checked_in and checkedInAt carries the moment of
+    # check-in. On an idempotent re-check-in alreadyCheckedIn is true and
+    # checkedInAt preserves the original check-in time.
+    CheckInResult:
+      type: object
+      required:
+        - id
+        - deskId
+        - date
+        - granularity
+        - status
+        - checkInState
+        - checkedInAt
+        - alreadyCheckedIn
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Unique reservation identifier"
+          example: "b2c4a1e0-7f3d-4a9b-8c11-0d2e5f6a7b8c"
+        deskId:
+          type: string
+          description: "The desk this reservation holds"
+          example: "desk-2b-014"
+        date:
+          type: string
+          format: date
+          example: "2026-07-27"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
+        status:
+          type: string
+          description: "Reservation lifecycle status; check-in keeps it active"
+          enum:
+            - active
+          example: "active"
+        checkInState:
+          type: string
+          description: "Check-in flag after the operation"
+          enum:
+            - checked_in
+          example: "checked_in"
+        checkedInAt:
+          type: string
+          format: date-time
+          description: "The recorded moment of check-in; on an idempotent re-check-in this is the original check-in time"
+          example: "2026-07-27T08:45:00+02:00"
+        alreadyCheckedIn:
+          type: boolean
+          description: "True when the reservation was already checked in and this call was an idempotent no-op; false on a fresh check-in"
+          example: false
+
+    # --- Shared value: booking granularity ---
+    Granularity:
+      type: string
+      description: "Booking granularity — a full day, or the morning or afternoon half-day. Anchors the reservation start used to derive the check-in window."
+      enum:
+        - FULL_DAY
+        - MORNING
+        - AFTERNOON
+      example: "FULL_DAY"
+
+    # --- Error Body Schema (STD-001) ---
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: UNAUTHENTICATED, SESSION_EXPIRED (401); NOT_RESERVATION_OWNER (403); RESERVATION_NOT_FOUND (404); RESERVATION_NOT_ACTIVE, RESERVATION_ALREADY_ENDED (409); NOT_A_DESK_RESERVATION, CHECK_IN_NOT_OPEN, CHECK_IN_WINDOW_EXPIRED (422)."
+          example: "CHECK_IN_WINDOW_EXPIRED"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users"
+          example: "This reservation has expired as a no-show and can no longer be checked in."
