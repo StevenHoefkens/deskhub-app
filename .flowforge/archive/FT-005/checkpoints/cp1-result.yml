@@ -1,0 +1,70 @@
+checkpoint: 1
+name: Domain Model & Contracts
+status: passed
+started_at: '2026-07-26T17:10:00Z'
+completed_at: '2026-07-26T17:20:00Z'
+duration_ms: 600000
+attempts: 2
+max_attempts: 3
+test_summary:
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  command: npm run type-check
+verification_evidence:
+  command: npm run type-check
+  exit_code: 0
+  summary: vue-tsc --build clean; uc-010/uc-011 types generated, room aliases compile
+  timestamp: '2026-07-26T17:20:00Z'
+files_touched:
+  created:
+    - src/types/contracts/uc-010.ts
+    - src/types/contracts/uc-011.ts
+  modified:
+    - src/types/booking.ts
+    - src/types/__tests__/booking.spec.ts
+    - src/lib/booking/reservation-display.ts
+    - src/components/booking/reservation-list/reservation-list.vue
+    - src/components/booking/reservation-card/reservation-card.spec.ts
+    - src/components/booking/reservation-list/reservation-list.spec.ts
+    - src/types/contracts/uc-004.ts
+    - src/types/contracts/uc-005.ts
+    - src/types/contracts/uc-006.ts
+    - src/types/contracts/uc-007.ts
+  deleted: []
+reasoning_entries: 3
+tdd_compliance: true
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: src/types/booking.ts (PascalCase type aliases; kebab-case files)
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: no domain literals introduced in the contract/type layer
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: no new dependencies added; openapi-typescript already present
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: npm run type-check exit 0, no warnings
+    deviated: false
+  - id: STD-020
+    name: Service README
+    where: no README change at CP1; README refresh owned by CP5
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: no spec/standard citations or narration in edited files
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: no owned scenarios in this slice; type tests carry no keys (Rule 6 — unkeyed tests legitimate)
+    deviated: false
+  - id: STD-037
+    name: Vue API Client & Query Composables (contract types R15/16)
+    where: types generated from .flowforge/contracts snapshot via scripts/generate-contracts.mjs; aliased in src/types/booking.ts (compile-time conformance = STD-024)
+    deviated: false

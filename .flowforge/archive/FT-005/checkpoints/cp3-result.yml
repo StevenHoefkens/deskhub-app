@@ -1,0 +1,68 @@
+checkpoint: 3
+name: Interface Layer
+status: passed
+started_at: '2026-07-26T17:30:00Z'
+completed_at: '2026-07-26T17:40:00Z'
+duration_ms: 600000
+attempts: 2
+max_attempts: 3
+test_summary:
+  total: 392
+  passed: 392
+  failed: 0
+  skipped: 0
+  command: npm test
+verification_evidence:
+  command: npm test
+  exit_code: 0
+  summary: vitest run — 392 passed (78 files), no type errors; room api + query/mutation composables covered
+  timestamp: '2026-07-26T17:40:00Z'
+files_touched:
+  created:
+    - src/composables/use-room-search.ts
+    - src/composables/use-reserve-room.ts
+    - src/composables/__tests__/use-room-search.spec.ts
+    - src/composables/__tests__/use-reserve-room.spec.ts
+  modified:
+    - src/api/booking.ts
+    - src/api/query-keys.ts
+    - src/api/__tests__/booking.spec.ts
+  deleted: []
+reasoning_entries: 2
+tdd_compliance: true
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: api/booking.ts (searchAvailableRooms/reserveRoom verbs); ROOMS_QUERY_KEY constant; composable file names kebab-case
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: SEARCH_ERROR_FALLBACK named; query param keys are contract field names, ROOMS_QUERY_KEY centralized
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: reuses @tanstack/vue-query + existing client/extractErrorInfo; no new deps
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: npm test exit 0, no type errors, no warnings
+    deviated: false
+  - id: STD-020
+    name: Service README
+    where: no README change at CP3; owned by CP5
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: new api/composable files carry no spec/standard citations or narration
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: no owned scenarios; api/composable tests carry no keys (Rule 6)
+    deviated: false
+  - id: STD-037
+    name: Vue API Client & Query Composables
+    where: >-
+      api/booking.ts room functions typed against generated contract types (compile-time conformance = STD-024);
+      use-room-search.ts (stable array key [...ROOMS_QUERY_KEY, params], reactive getter, keepPreviousData, staleTime 30s, get{Resource}ErrorMessage);
+      use-reserve-room.ts (mutate/mutateAsync/isPending/isSuccess/data/fieldErrors/reset, invalidates rooms+reservations, no toast in composable)
+    deviated: false

@@ -6,7 +6,12 @@ import { useMyReservations, getMyReservationsErrorMessage } from '@/composables/
 import { useCancelReservation } from '@/composables/use-cancel-reservation'
 import { useToast } from '@/lib/toast'
 import { useI18n } from '@/lib/i18n/use-i18n'
-import { checkInBadge, granularityLabelKey, type BadgeVariant } from '@/lib/booking/reservation-display'
+import {
+  checkInBadge,
+  granularityLabelKey,
+  formatSlotRange,
+  type BadgeVariant,
+} from '@/lib/booking/reservation-display'
 import type { CheckInState } from '@/types/booking'
 
 const { t } = useI18n()
@@ -23,11 +28,11 @@ const isError = computed(() => query.isError.value)
 const errorMessage = computed(() => getMyReservationsErrorMessage(query.error.value ?? null))
 const isCancelPending = computed(() => cancel.isPending.value)
 
-function checkInLabel(state: CheckInState): string {
+function checkInLabel(state: CheckInState | undefined): string {
   return t(checkInBadge(state).labelKey)
 }
 
-function checkInVariant(state: CheckInState): BadgeVariant {
+function checkInVariant(state: CheckInState | undefined): BadgeVariant {
   return checkInBadge(state).variant
 }
 
@@ -71,6 +76,7 @@ async function confirmCancel(): Promise<void> {
       :granularity-label="t(granularityLabelKey(reservation.granularity))"
       :check-in-label="checkInLabel(reservation.checkInState)"
       :check-in-variant="checkInVariant(reservation.checkInState)"
+      :slot-range-label="formatSlotRange(reservation.startsAt, reservation.endsAt)"
       :cancel-label="t('booking.cancel.label')"
       :cancel-aria="t('booking.cancel.aria')"
       :is-cancelling="isCancelPending && pendingCancelId === reservation.id"

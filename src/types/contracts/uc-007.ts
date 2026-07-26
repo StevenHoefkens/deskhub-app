@@ -9,7 +9,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel the caller's own reservation before its range ends and free the desk */
+        /** Cancel the caller's own reservation (desk or room) before its range ends and free the resource */
         post: operations["cancelReservation"];
         delete?: never;
         options?: never;
@@ -34,16 +34,39 @@ export interface components {
              */
             status: "cancelled";
             /**
-             * @description The desk freed by the cancellation
-             * @example desk-2b-014
+             * @description Which kind of resource was freed
+             * @example desk
+             * @enum {string}
              */
-            deskId: string;
+            resourceType: "desk" | "room";
             /**
              * Format: date
              * @example 2026-07-27
              */
             date: string;
-            granularity: components["schemas"]["Granularity"];
+            /**
+             * @description The desk freed by the cancellation — present when resourceType is desk
+             * @example desk-2b-014
+             */
+            deskId?: string;
+            granularity?: components["schemas"]["Granularity"];
+            /**
+             * @description The room freed by the cancellation — present when resourceType is room
+             * @example room-3-201
+             */
+            roomId?: string;
+            /**
+             * Format: date-time
+             * @description Inclusive start of the freed slot range — present when resourceType is room
+             * @example 2026-07-27T10:00:00+02:00
+             */
+            startsAt?: string;
+            /**
+             * Format: date-time
+             * @description Exclusive end of the freed slot range — present when resourceType is room
+             * @example 2026-07-27T11:00:00+02:00
+             */
+            endsAt?: string;
         };
         /**
          * @description Booking granularity — a full day, or the morning or afternoon half-day

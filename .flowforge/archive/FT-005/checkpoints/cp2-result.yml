@@ -1,0 +1,59 @@
+checkpoint: 2
+name: Domain Logic & Rules
+status: passed
+started_at: '2026-07-26T17:20:00Z'
+completed_at: '2026-07-26T17:30:00Z'
+duration_ms: 600000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 374
+  passed: 374
+  failed: 0
+  skipped: 0
+  command: npm test
+verification_evidence:
+  command: npm test
+  exit_code: 0
+  summary: vitest run — 374 passed (74 files), no type errors; slot-range + room validation covered
+  timestamp: '2026-07-26T17:30:00Z'
+files_touched:
+  created:
+    - src/lib/booking/slot-range.ts
+    - src/lib/booking/__tests__/slot-range.spec.ts
+    - src/validation/room.ts
+    - src/validation/__tests__/room.spec.ts
+  modified:
+    - src/composables/__tests__/use-cancel-reservation.spec.ts
+  deleted: []
+reasoning_entries: 3
+tdd_compliance: true
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: slot-range.ts / room.ts (camelCase verbs isAlignedTime/validateRoomSearch; SCREAMING_SNAKE constants)
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: SLOT_STEP_MINUTES, MIN_CAPACITY_FLOOR, aligned-time pattern named; message strings as named constants
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: no new dependencies; reuses booking-window helpers
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: npm test exit 0, no type errors, no warnings
+    deviated: false
+  - id: STD-020
+    name: Service README
+    where: no README change at CP2; owned by CP5
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: slot-range.ts / room.ts carry no spec/standard citations or narration
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: no owned scenarios; validation unit tests carry no keys (Rule 6)
+    deviated: false

@@ -15,6 +15,7 @@ const cancelMock = vi.mocked(cancelReservation)
 
 const RESERVATION: ReservationSummary = {
   id: 'res-5501',
+  resourceType: 'desk',
   deskId: 'desk-2b-014',
   zoneId: 'zone-2b',
   floor: '2',
@@ -24,11 +25,23 @@ const RESERVATION: ReservationSummary = {
   checkInState: 'not_checked_in',
 }
 
+const ROOM_RESERVATION: ReservationSummary = {
+  id: 'res-7702',
+  resourceType: 'room',
+  roomId: 'room-3-201',
+  floor: '3',
+  date: '2026-07-27',
+  status: 'active',
+  startsAt: '2026-07-27T10:00:00+02:00',
+  endsAt: '2026-07-27T11:00:00+02:00',
+}
+
 const ONE: MyReservations = { reservations: [RESERVATION] }
 
 const CANCELLED: CancelResult = {
   id: 'res-5501',
   status: 'cancelled',
+  resourceType: 'desk',
   deskId: 'desk-2b-014',
   date: '2026-07-27',
   granularity: 'FULL_DAY',
@@ -58,6 +71,16 @@ describe('ReservationList', () => {
     expect(wrapper.get('.status-badge').text()).toBe('Not checked in')
   })
 
+  it('renders a room reservation with its slot range and no check-in badge', async () => {
+    listMock.mockResolvedValue({ reservations: [ROOM_RESERVATION] })
+    const wrapper = mountList()
+    await flushPromises()
+
+    expect(wrapper.get('.reservation-card__label').text()).toBe('room-3-201')
+    expect(wrapper.get('.reservation-card__slot').text()).toBe('10:00–11:00')
+    expect(wrapper.find('.status-badge').exists()).toBe(false)
+  })
+
   it('shows the empty notice when there are no reservations', async () => {
     listMock.mockResolvedValue({ reservations: [] })
     const wrapper = mountList()
@@ -81,7 +104,7 @@ describe('ReservationList', () => {
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     await wrapper.get('.reservation-card__cancel').trigger('click')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Cancel this reservation and free the desk?')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Cancel this reservation and free the resource?')
     expect(cancelMock).not.toHaveBeenCalled()
   })
 
@@ -100,7 +123,7 @@ describe('ReservationList', () => {
       useToast().toasts.value.some(
         (toast) =>
           toast.variant === 'success' &&
-          toast.message === 'Reservation cancelled. The desk is free again.',
+          toast.message === 'Reservation cancelled. The resource is free again.',
       ),
     ).toBe(true)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)

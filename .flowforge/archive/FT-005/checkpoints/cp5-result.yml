@@ -1,0 +1,63 @@
+checkpoint: 5
+name: Deployment Topology
+status: passed
+started_at: '2026-07-26T18:05:00Z'
+completed_at: '2026-07-26T18:12:00Z'
+duration_ms: 420000
+attempts: 1
+max_attempts: 3
+test_summary:
+  total: 426
+  passed: 426
+  failed: 0
+  skipped: 0
+  command: npm test
+verification_evidence:
+  command: npm run build && npm test
+  exit_code: 0
+  summary: >-
+    Production build succeeded (vue-tsc + vite); bundle budget OK — total JS 59.9 KB gzipped (budget 200 KB),
+    find-room-view chunk 3.1 KB (< 50 KB per-chunk). Full regression 426 passed (86 files), no type errors.
+  timestamp: '2026-07-26T18:12:00Z'
+files_touched:
+  created: []
+  modified:
+    - README.md
+  deleted: []
+reasoning_entries: 1
+tdd_compliance: true
+standards_applied:
+  - id: STD-003
+    name: Naming Conventions
+    where: no new code; README route table uses canonical route paths
+    deviated: false
+  - id: STD-005
+    name: Performance Budgets
+    where: >-
+      bundle budget enforced in build (scripts/check-bundle-budget.mjs) — total 59.9 KB < 200 KB gzipped,
+      new find-room-view lazy chunk 3.1 KB < 50 KB per-chunk guideline; room view lazy-loaded per route
+    deviated: false
+  - id: STD-017
+    name: No Magic Values
+    where: no code change at CP5
+    deviated: false
+  - id: STD-018
+    name: No Unused Dependencies
+    where: production build clean; no new dependencies introduced across the feature
+    deviated: false
+  - id: STD-019
+    name: Zero Warnings
+    where: build, test, lint all exit 0; no bundle over-chunk warnings
+    deviated: false
+  - id: STD-020
+    name: Service README
+    where: README.md updated — routes table (adds /rooms), room booking in intro, room search in VITE_API_BASE_URL note
+    deviated: false
+  - id: STD-032
+    name: Comment Discipline
+    where: no code change at CP5; README carries no spec/standard citations
+    deviated: false
+  - id: STD-035
+    name: Scenario-Key Test Binding
+    where: no owned scenarios; regression suite unchanged (no keys required)
+    deviated: false

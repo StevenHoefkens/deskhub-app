@@ -8,6 +8,7 @@ const props = defineProps<{
   granularityLabel: string
   checkInLabel: string
   checkInVariant: BadgeVariant
+  slotRangeLabel: string
   cancelLabel: string
   cancelAria: string
   isCancelling?: boolean
@@ -18,12 +19,20 @@ const emit = defineEmits<{ cancel: [string] }>()
 
 <template>
   <div class="reservation-card">
-    <p class="reservation-card__label">{{ props.reservation.deskId }}</p>
-    <p class="reservation-card__zone">{{ props.reservation.zoneId }}</p>
-    <p class="reservation-card__floor">{{ props.reservation.floor }}</p>
-    <p class="reservation-card__date">{{ props.reservation.date }}</p>
-    <p class="reservation-card__granularity">{{ granularityLabel }}</p>
-    <StatusBadge :label="checkInLabel" :variant="checkInVariant" />
+    <template v-if="props.reservation.resourceType === 'desk'">
+      <p class="reservation-card__label">{{ props.reservation.deskId }}</p>
+      <p class="reservation-card__zone">{{ props.reservation.zoneId }}</p>
+      <p class="reservation-card__floor">{{ props.reservation.floor }}</p>
+      <p class="reservation-card__date">{{ props.reservation.date }}</p>
+      <p class="reservation-card__granularity">{{ granularityLabel }}</p>
+      <StatusBadge :label="checkInLabel" :variant="checkInVariant" />
+    </template>
+    <template v-else>
+      <p class="reservation-card__label">{{ props.reservation.roomId }}</p>
+      <p class="reservation-card__floor">{{ props.reservation.floor }}</p>
+      <p class="reservation-card__date">{{ props.reservation.date }}</p>
+      <p class="reservation-card__slot">{{ slotRangeLabel }}</p>
+    </template>
     <button
       type="button"
       class="reservation-card__cancel"
@@ -55,7 +64,8 @@ const emit = defineEmits<{ cancel: [string] }>()
 .reservation-card__zone,
 .reservation-card__floor,
 .reservation-card__date,
-.reservation-card__granularity {
+.reservation-card__granularity,
+.reservation-card__slot {
   color: var(--color-text-muted);
   margin: 0;
 }

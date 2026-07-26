@@ -11,7 +11,7 @@ paths:
   /reservations:
     get:
       operationId: "listMyReservations"
-      summary: "List the authenticated employee's own active and upcoming desk reservations"
+      summary: "List the authenticated employee's own active and upcoming reservations (desks and rooms)"
       tags:
         - "reservation"
       security:
@@ -24,7 +24,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/MyReservations"
         "401":
-          description: "No valid session — the caller is unauthenticated or the session has expired"
+          description: "No valid session — the caller is unauthenticated (UNAUTHENTICATED) or the session has expired (SESSION_EXPIRED)"
           content:
             application/json:
               schema:
@@ -46,32 +46,34 @@ components:
       properties:
         reservations:
           type: array
-          description: "The caller's active and upcoming desk reservations; empty when none"
+          description: "The caller's active and upcoming reservations across resource types (desks and rooms); empty when none"
           items:
             $ref: "#/components/schemas/ReservationSummary"
 
+    # A resource-agnostic reservation row. `resourceType` discriminates the two
+    # projections: desk rows carry deskId/zoneId/granularity/checkInState; room
+    # rows carry roomId/startsAt/endsAt and have no check-in state. Fields common
+    # to both (id, resourceType, floor, date, status) are required.
     ReservationSummary:
       type: object
       required:
         - id
-        - deskId
-        - zoneId
+        - resourceType
         - floor
         - date
-        - granularity
         - status
-        - checkInState
       properties:
         id:
           type: string
           format: uuid
           example: "b2c4a1e0-7f3d-4a9b-8c11-0d2e5f6a7b8c"
-        deskId:
+        resourceType:
           type: string
-          example: "desk-2b-014"
-        zoneId:
-          type: string
-          example: "zone-2b"
+          description: "Which kind of resource this reservation is for"
+          enum:
+            - desk
+            - room
+          example: "desk"
         floor:
           type: string
           description: "Floor label (may be negative, e.g. -1)"
@@ -80,8 +82,6 @@ components:
           type: string
           format: date
           example: "2026-07-27"
-        granularity:
-          $ref: "#/components/schemas/Granularity"
         status:
           type: string
           enum:
@@ -89,12 +89,37 @@ components:
             - cancelled
             - no_show
           example: "active"
+        deskId:
+          type: string
+          description: "Desk identifier — present when resourceType is desk"
+          example: "desk-2b-014"
+        zoneId:
+          type: string
+          description: "Zone of the desk — present when resourceType is desk"
+          example: "zone-2b"
+        granularity:
+          $ref: "#/components/schemas/Granularity"
         checkInState:
           type: string
+          description: "Check-in flag — present only when resourceType is desk; room reservations have no check-in state"
           enum:
             - not_checked_in
             - checked_in
           example: "not_checked_in"
+        roomId:
+          type: string
+          description: "Room identifier — present when resourceType is room"
+          example: "room-3-201"
+        startsAt:
+          type: string
+          format: date-time
+          description: "Inclusive start of the reserved slot range — present when resourceType is room"
+          example: "2026-07-27T10:00:00+02:00"
+        endsAt:
+          type: string
+          format: date-time
+          description: "Exclusive end of the reserved slot range — present when resourceType is room"
+          example: "2026-07-27T11:00:00+02:00"
 
     Granularity:
       type: string
@@ -114,7 +139,7 @@ components:
       properties:
         code:
           type: string
-          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: SESSION_EXPIRED."
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: SESSION_EXPIRED, UNAUTHENTICATED."
           example: "SESSION_EXPIRED"
         message:
           type: string

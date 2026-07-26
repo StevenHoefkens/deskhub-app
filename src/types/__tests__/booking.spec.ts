@@ -3,6 +3,7 @@ import type {
   Granularity,
   ReservationStatus,
   CheckInState,
+  ResourceType,
   AvailableDesk,
   DeskSearchResults,
   DeskSearchParams,
@@ -11,11 +12,18 @@ import type {
   MyReservations,
   ReservationSummary,
   CancelResult,
+  AvailableRoom,
+  RoomSearchResults,
+  RoomSearchParams,
+  ReserveRoomRequest,
+  RoomReservation,
 } from '@/types/booking'
 import type { components as Uc004 } from '@/types/contracts/uc-004'
 import type { components as Uc005 } from '@/types/contracts/uc-005'
 import type { components as Uc006 } from '@/types/contracts/uc-006'
 import type { components as Uc007 } from '@/types/contracts/uc-007'
+import type { components as Uc010 } from '@/types/contracts/uc-010'
+import type { components as Uc011 } from '@/types/contracts/uc-011'
 import type { FieldError, ApiErrorBody, ApiErrorDetail } from '@/types/errors'
 
 describe('booking domain types', () => {
@@ -48,6 +56,55 @@ describe('booking domain types', () => {
     expectTypeOf<MyReservations>().toEqualTypeOf<Uc006['schemas']['MyReservations']>()
     expectTypeOf<ReservationSummary>().toEqualTypeOf<Uc006['schemas']['ReservationSummary']>()
     expectTypeOf<CancelResult>().toEqualTypeOf<Uc007['schemas']['CancelResult']>()
+  })
+
+  it('binds the resource-type discriminator to the reservation summary contract', () => {
+    expectTypeOf<ResourceType>().toEqualTypeOf<'desk' | 'room'>()
+    expectTypeOf<ReservationSummary['resourceType']>().toEqualTypeOf<ResourceType>()
+  })
+
+  it('models desk-only summary fields as optional (absent on room rows)', () => {
+    expectTypeOf<ReservationSummary['granularity']>().toEqualTypeOf<Granularity | undefined>()
+    expectTypeOf<ReservationSummary['checkInState']>().toEqualTypeOf<CheckInState | undefined>()
+  })
+
+  it('exposes room-only summary fields for room rows', () => {
+    expectTypeOf<ReservationSummary['roomId']>().toEqualTypeOf<string | undefined>()
+    expectTypeOf<ReservationSummary['startsAt']>().toEqualTypeOf<string | undefined>()
+    expectTypeOf<ReservationSummary['endsAt']>().toEqualTypeOf<string | undefined>()
+  })
+})
+
+describe('room booking domain types', () => {
+  it('aliases the room search contract schemas', () => {
+    expectTypeOf<AvailableRoom>().toEqualTypeOf<Uc010['schemas']['AvailableRoom']>()
+    expectTypeOf<RoomSearchResults>().toEqualTypeOf<Uc010['schemas']['RoomSearchResults']>()
+  })
+
+  it('models the room search params with a required date and slot range plus optional filters', () => {
+    expectTypeOf<RoomSearchParams['date']>().toEqualTypeOf<string>()
+    expectTypeOf<RoomSearchParams['startTime']>().toEqualTypeOf<string>()
+    expectTypeOf<RoomSearchParams['endTime']>().toEqualTypeOf<string>()
+    expectTypeOf<RoomSearchParams['minCapacity']>().toEqualTypeOf<number | undefined>()
+    expectTypeOf<RoomSearchParams['tags']>().toEqualTypeOf<string[] | undefined>()
+  })
+
+  it('exposes the available room presentation fields', () => {
+    expectTypeOf<AvailableRoom['roomId']>().toEqualTypeOf<string>()
+    expectTypeOf<AvailableRoom['floor']>().toEqualTypeOf<string>()
+    expectTypeOf<AvailableRoom['maxCapacity']>().toEqualTypeOf<number>()
+    expectTypeOf<AvailableRoom['tags']>().toEqualTypeOf<string[]>()
+  })
+
+  it('aliases the reserve-room request and room reservation schemas', () => {
+    expectTypeOf<ReserveRoomRequest>().toEqualTypeOf<Uc011['schemas']['ReserveRoomRequest']>()
+    expectTypeOf<RoomReservation>().toEqualTypeOf<Uc011['schemas']['RoomReservation']>()
+  })
+
+  it('models the reserve-room request as a bare date and slot range', () => {
+    expectTypeOf<ReserveRoomRequest['date']>().toEqualTypeOf<string>()
+    expectTypeOf<ReserveRoomRequest['startTime']>().toEqualTypeOf<string>()
+    expectTypeOf<ReserveRoomRequest['endTime']>().toEqualTypeOf<string>()
   })
 })
 

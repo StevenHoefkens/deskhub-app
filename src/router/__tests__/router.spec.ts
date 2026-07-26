@@ -21,6 +21,12 @@ describe('router', () => {
     expect(route.matched.length).toBeGreaterThan(0)
   })
 
+  it('registers the find-room route', () => {
+    const route = router.resolve('/rooms')
+    expect(route.name).toBe('find-room')
+    expect(route.matched.length).toBeGreaterThan(0)
+  })
+
   it('registers the my-reservations route', () => {
     const route = router.resolve('/reservations')
     expect(route.name).toBe('my-reservations')

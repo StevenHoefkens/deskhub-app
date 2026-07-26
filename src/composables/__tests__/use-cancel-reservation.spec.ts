@@ -13,6 +13,7 @@ const cancelMock = vi.mocked(cancelReservation)
 const CANCEL_RESULT: CancelResult = {
   id: 'r1',
   status: 'cancelled',
+  resourceType: 'desk',
   deskId: 'desk-2b-014',
   date: '2026-07-27',
   granularity: 'FULL_DAY',

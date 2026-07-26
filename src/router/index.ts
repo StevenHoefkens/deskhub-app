@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { LOGIN_ROUTE_PATH, HOME_PATH } from '@/config/auth'
 
 const FIND_DESK_ROUTE_PATH = '/desks'
+const FIND_ROOM_ROUTE_PATH = '/rooms'
 const MY_RESERVATIONS_ROUTE_PATH = '/reservations'
 
 export const router = createRouter({
@@ -17,6 +18,11 @@ export const router = createRouter({
       path: FIND_DESK_ROUTE_PATH,
       name: 'find-desk',
       component: () => import('@/views/booking/find-desk-view.vue'),
+    },
+    {
+      path: FIND_ROOM_ROUTE_PATH,
+      name: 'find-room',
+      component: () => import('@/views/booking/find-room-view.vue'),
     },
     {
       path: MY_RESERVATIONS_ROUTE_PATH,

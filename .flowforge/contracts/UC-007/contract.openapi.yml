@@ -11,7 +11,7 @@ paths:
   /reservations/{reservationId}/cancel:
     post:
       operationId: "cancelReservation"
-      summary: "Cancel the caller's own reservation before its range ends and free the desk"
+      summary: "Cancel the caller's own reservation (desk or room) before its range ends and free the resource"
       tags:
         - "reservation"
       security:
@@ -59,14 +59,16 @@ components:
       description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
   schemas:
     # --- Response Schema (the success data body, camelCase, unwrapped) ---
+    # Result of cancelling a reservation of either resource type. `resourceType`
+    # discriminates: a desk cancellation carries deskId + granularity; a room
+    # cancellation carries roomId + the freed slot range (startsAt/endsAt).
     CancelResult:
       type: object
       required:
         - id
         - status
-        - deskId
+        - resourceType
         - date
-        - granularity
       properties:
         id:
           type: string
@@ -78,16 +80,37 @@ components:
           enum:
             - cancelled
           example: "cancelled"
-        deskId:
+        resourceType:
           type: string
-          description: "The desk freed by the cancellation"
-          example: "desk-2b-014"
+          description: "Which kind of resource was freed"
+          enum:
+            - desk
+            - room
+          example: "desk"
         date:
           type: string
           format: date
           example: "2026-07-27"
+        deskId:
+          type: string
+          description: "The desk freed by the cancellation — present when resourceType is desk"
+          example: "desk-2b-014"
         granularity:
           $ref: "#/components/schemas/Granularity"
+        roomId:
+          type: string
+          description: "The room freed by the cancellation — present when resourceType is room"
+          example: "room-3-201"
+        startsAt:
+          type: string
+          format: date-time
+          description: "Inclusive start of the freed slot range — present when resourceType is room"
+          example: "2026-07-27T10:00:00+02:00"
+        endsAt:
+          type: string
+          format: date-time
+          description: "Exclusive end of the freed slot range — present when resourceType is room"
+          example: "2026-07-27T11:00:00+02:00"
 
     # --- Shared value: booking granularity ---
     Granularity:

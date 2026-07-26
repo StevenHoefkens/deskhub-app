@@ -1,0 +1,183 @@
+openapi: "3.0.3"
+info:
+  title: "Reserve a room"
+  version: "1.0.0"
+
+servers:
+  - url: /api
+    description: "DeskHub API gateway"
+
+paths:
+  /rooms/{roomId}/reservations:
+    post:
+      operationId: "reserveRoom"
+      summary: "Book a room for a contiguous range of 15-minute slots"
+      tags:
+        - "reservation"
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          description: "Identifier of the room to book"
+          schema:
+            type: string
+          example: "room-3-201"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReserveRoomRequest"
+      responses:
+        "201":
+          description: "Room reservation created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomReservation"
+        "400":
+          description: "Validation error — date/range in the past, or a range that is not contiguous and aligned to 15-minute boundaries"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Room not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "One or more slots in the range are unavailable — already taken, out of service, within a blackout, or just taken under contention"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: DESKHUB_SESSION
+      description: "DeskHub session cookie set after SSO login (UC-001). Required for all authenticated operations."
+  schemas:
+    # --- Request Schema (camelCase, unwrapped) ---
+    ReserveRoomRequest:
+      type: object
+      required:
+        - date
+        - startTime
+        - endTime
+      properties:
+        date:
+          type: string
+          format: date
+          description: "Booking date; the slot range must not be in the past. No upper horizon."
+          example: "2026-07-27"
+        startTime:
+          type: string
+          description: "Inclusive start of the slot range, local wall-clock, aligned to a 15-minute boundary (:00, :15, :30, :45)"
+          pattern: "^([01][0-9]|2[0-3]):(00|15|30|45)$"
+          example: "10:00"
+        endTime:
+          type: string
+          description: "Exclusive end of the slot range, aligned to a 15-minute boundary and strictly after startTime"
+          pattern: "^([01][0-9]|2[0-3]):(00|15|30|45)$"
+          example: "11:00"
+
+    # --- Response Schema (the created room Reservation, camelCase, unwrapped) ---
+    # Named RoomReservation (not Reservation) — the room projection of the shared
+    # reservation entity: slot-ranged, no granularity, no check-in state. Distinct
+    # from UC-004's desk Reservation schema.
+    RoomReservation:
+      type: object
+      required:
+        - id
+        - roomId
+        - floor
+        - date
+        - startsAt
+        - endsAt
+        - bookerId
+        - occupantId
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Unique reservation identifier"
+          example: "d7f1a2b3-4c5e-4f60-9a71-2b3c4d5e6f70"
+        roomId:
+          type: string
+          example: "room-3-201"
+        floor:
+          type: string
+          description: "Floor label of the room (may be negative, e.g. -1)"
+          example: "3"
+        date:
+          type: string
+          format: date
+          example: "2026-07-27"
+        startsAt:
+          type: string
+          format: date-time
+          description: "Inclusive start of the reserved slot range"
+          example: "2026-07-27T10:00:00+02:00"
+        endsAt:
+          type: string
+          format: date-time
+          description: "Exclusive end of the reserved slot range"
+          example: "2026-07-27T11:00:00+02:00"
+        bookerId:
+          type: string
+          description: "The user who made the booking"
+          example: "user-2231"
+        occupantId:
+          type: string
+          description: "The user who will occupy the room; equal to bookerId in MVP (self-only)"
+          example: "user-2231"
+        status:
+          type: string
+          description: "Reservation lifecycle status; a room reservation is never marked no_show (rooms are excluded from check-in / no-show)"
+          enum:
+            - active
+            - cancelled
+          example: "active"
+
+    # --- Error Body Schema (STD-001) ---
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Machine-readable error code (SCREAMING_SNAKE_CASE — STD-002). One of: INVALID_DATE, INVALID_SLOT_RANGE, ROOM_NOT_FOUND, ROOM_NOT_AVAILABLE."
+          example: "ROOM_NOT_AVAILABLE"
+        message:
+          type: string
+          description: "Human-readable message, safe to display to end users"
+          example: "One or more of the selected time slots is no longer available."
+        details:
+          type: array
+          description: "Field-level validation errors (HTTP 400 — STD-001 Rule 8)"
+          items:
+            type: object
+            required:
+              - field
+              - rule
+              - message
+            properties:
+              field:
+                type: string
+                example: "endTime"
+              rule:
+                type: string
+                example: "alignment"
+              message:
+                type: string
+                example: "Times must fall on 15-minute boundaries (:00, :15, :30, :45)."

@@ -4,6 +4,8 @@ import {
   reserveDesk,
   listMyReservations,
   cancelReservation,
+  searchAvailableRooms,
+  reserveRoom,
 } from '@/api/booking'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -67,5 +69,44 @@ describe('booking api service', () => {
     const [url, init] = lastRequest()
     expect(url).toContain('/reservations/res%205501/cancel')
     expect(init.method).toBe('POST')
+  })
+
+  it('builds the room search query with date, slot range, capacity and repeated tags', async () => {
+    await searchAvailableRooms({
+      date: '2026-07-27',
+      startTime: '10:00',
+      endTime: '11:00',
+      minCapacity: 6,
+      tags: ['beamer', 'video-conference'],
+    })
+    const [url, init] = lastRequest()
+    expect(init.method ?? 'GET').toBe('GET')
+    expect(url).toContain('/rooms?')
+    expect(url).toContain('date=2026-07-27')
+    expect(url).toContain('startTime=10%3A00')
+    expect(url).toContain('endTime=11%3A00')
+    expect(url).toContain('minCapacity=6')
+    expect(url).toContain('tags=beamer')
+    expect(url).toContain('tags=video-conference')
+  })
+
+  it('omits optional room search params when not supplied', async () => {
+    await searchAvailableRooms({ date: '2026-07-27', startTime: '10:00', endTime: '11:00' })
+    const [url] = lastRequest()
+    expect(url).not.toContain('minCapacity=')
+    expect(url).not.toContain('tags=')
+  })
+
+  it('posts a room reservation to the room reservations path with an encoded room id', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: 'r1' }), { status: 201 }))
+    await reserveRoom('room 3 201', { date: '2026-07-27', startTime: '10:00', endTime: '11:00' })
+    const [url, init] = lastRequest()
+    expect(url).toContain('/rooms/room%203%20201/reservations')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      date: '2026-07-27',
+      startTime: '10:00',
+      endTime: '11:00',
+    })
   })
 })
